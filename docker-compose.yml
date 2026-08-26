@@ -1,0 +1,94 @@
+# Requiere Docker Compose v2.20+ (usa `condition: service_completed_successfully`).
+# Verificar con: docker compose version
+
+services:
+  # Genera la jerarquía de PKI una sola vez y termina. Los demás servicios
+  # esperan a que este container termine exitosamente antes de arrancar.
+  ca-setup:
+    build: ./ca
+    environment:
+      - CERTS_OUT=/certs
+    volumes:
+      - ./certs:/certs
+
+  coordinador-nacional:
+    build: ./nodes
+    environment:
+      - ORG_NAME=coordinador-nacional
+      - PORT=3000
+      - PEERS=http://coordinador-provincial:3000,http://hospital-donante:3000,http://hospital-receptor:3000
+      - CERTS_DIR=/certs
+      - LEDGER_DATA_DIR=/data
+    volumes:
+      - ./certs:/certs:ro
+      - ./data/coordinador-nacional:/data
+    ports:
+      - "3001:3000"
+    depends_on:
+      ca-setup:
+        condition: service_completed_successfully
+
+  coordinador-provincial:
+    build: ./nodes
+    environment:
+      - ORG_NAME=coordinador-provincial
+      - PORT=3000
+      - PEERS=http://coordinador-nacional:3000,http://hospital-donante:3000,http://hospital-receptor:3000
+      - CERTS_DIR=/certs
+      - LEDGER_DATA_DIR=/data
+    volumes:
+      - ./certs:/certs:ro
+      - ./data/coordinador-provincial:/data
+    ports:
+      - "3002:3000"
+    depends_on:
+      ca-setup:
+        condition: service_completed_successfully
+
+  hospital-donante:
+    build: ./nodes
+    environment:
+      - ORG_NAME=hospital-donante
+      - PORT=3000
+      - PEERS=http://coordinador-nacional:3000,http://coordinador-provincial:3000,http://hospital-receptor:3000
+      - CERTS_DIR=/certs
+      - LEDGER_DATA_DIR=/data
+    volumes:
+      - ./certs:/certs:ro
+      - ./data/hospital-donante:/data
+    ports:
+      - "3003:3000"
+    depends_on:
+      ca-setup:
+        condition: service_completed_successfully
+
+  hospital-receptor:
+    build: ./nodes
+    environment:
+      - ORG_NAME=hospital-receptor
+      - PORT=3000
+      - PEERS=http://coordinador-nacional:3000,http://coordinador-provincial:3000,http://hospital-donante:3000
+      - CERTS_DIR=/certs
+      - LEDGER_DATA_DIR=/data
+    volumes:
+      - ./certs:/certs:ro
+      - ./data/hospital-receptor:/data
+    ports:
+      - "3004:3000"
+    depends_on:
+      ca-setup:
+        condition: service_completed_successfully
+
+  iot-simulator:
+    build: ./iot-simulator
+    environment:
+      - DEVICE_ID=sensor-contenedor-001
+      - CERTS_DIR=/certs
+      - CUSTODY_NODE_URL=http://hospital-donante:3000
+      - INTERVALO_MS=5000
+      - ORGANO=rinon
+      - SIMULAR_FALLA_TEMP=true
+    volumes:
+      - ./certs:/certs:ro
+    depends_on:
+      - hospital-donante

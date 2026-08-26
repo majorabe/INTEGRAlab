@@ -1,0 +1,14 @@
+{
+  "name": "integra-node",
+  "version": "1.0.0",
+  "description": "Nodo de organizacion INTEGRA (ledger + validacion + endorsement)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "node-forge": "^1.3.1",
+    "axios": "^1.7.2"
+  }
+}

@@ -20,6 +20,7 @@ const axios = require("axios");
 const { signPayload, verifySignature } = require("./lib/crypto-utils");
 const ledger = require("./lib/ledger");
 const { checkEndorsement } = require("./lib/endorsement");
+const { queryCompatible } = require("./lib/hla-matching");
 
 const ORG_NAME = process.env.ORG_NAME;
 const PORT = process.env.PORT || 3000;
@@ -117,7 +118,7 @@ async function submitTransaction(txType, payload, signatures) {
     return { status: 401, body: { ok: false, reason: "Firma(s) inválida(s)", details: invalidReasons } };
   }
 
-  const endorsement = checkEndorsement(txType, validOrgs);
+  const endorsement = checkEndorsement(txType, validOrgs, payload);
   if (!endorsement.ok) {
     return { status: 403, body: { ok: false, reason: endorsement.reason } };
   }
@@ -179,6 +180,36 @@ app.get("/ledger", (req, res) => {
  */
 app.get("/verify-integrity", (req, res) => {
   res.json(ledger.verifyChainIntegrity());
+});
+
+/**
+ * Motor de compatibilidad HLA (CompatibilityEngine).
+ * Endpoint de solo lectura que calcula la compatibilidad entre un donante
+ * y los candidatos en la lista de espera.
+ *
+ * No requiere firma criptográfica (es solo lectura, sin estado en el ledger).
+ * Devuelve un compatibilityTimestamp que debe incluirse en la posterior
+ * transacción de asignación como prueba del momento de cálculo
+ * (prevención de replay).
+ */
+app.post("/compatibility/query", (req, res) => {
+  const { donorProfile, waitingList } = req.body || {};
+
+  if (!donorProfile || !waitingList) {
+    return res.status(400).json({
+      ok: false,
+      reason: "Se requiere donorProfile (bloodType + hlaProfile) y waitingList",
+    });
+  }
+
+  const ranked = queryCompatible(donorProfile, waitingList);
+  const compatibilityTimestamp = new Date().toISOString();
+
+  res.json({
+    ok: true,
+    compatibilityTimestamp,
+    rankedCandidates: ranked,
+  });
 });
 
 /**

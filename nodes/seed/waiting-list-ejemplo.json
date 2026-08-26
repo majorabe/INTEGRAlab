@@ -1,0 +1,42 @@
+[
+  {
+    "patientId": "patient-001",
+    "bloodType": "O+",
+    "hlaProfile": {
+      "A": "A2",
+      "B": "B7",
+      "DR": "DR4"
+    },
+    "urgencyLevel": 3
+  },
+  {
+    "patientId": "patient-002",
+    "bloodType": "A+",
+    "hlaProfile": {
+      "A": "A2",
+      "B": "B8",
+      "DR": "DR3"
+    },
+    "urgencyLevel": 5
+  },
+  {
+    "patientId": "patient-003",
+    "bloodType": "B+",
+    "hlaProfile": {
+      "A": "A1",
+      "B": "B7",
+      "DR": "DR4"
+    },
+    "urgencyLevel": 2
+  },
+  {
+    "patientId": "patient-004",
+    "bloodType": "AB+",
+    "hlaProfile": {
+      "A": "A3",
+      "B": "B44",
+      "DR": "DR13"
+    },
+    "urgencyLevel": 4
+  }
+]

@@ -1,0 +1,24 @@
+{
+  "name": "integra-blockchain",
+  "version": "1.0.0",
+  "description": "Blockchain-based organ donation management system with PKI, HLA compatibility, and security controls",
+  "main": "nodes/server.js",
+  "scripts": {
+    "test:seguridad": "node tests/run-tests.js"
+  },
+  "keywords": [
+    "blockchain",
+    "organ-donation",
+    "healthcare",
+    "pki",
+    "x509"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "axios": "^1.4.0",
+    "crypto": "^1.0.1",
+    "node-forge": "^1.3.0"
+  }
+}

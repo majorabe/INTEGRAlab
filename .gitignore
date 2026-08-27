@@ -1,1 +1,28 @@
+# Dependencias
+node_modules/
+
+# Variables de entorno
+.env
+.env.*
+
+# PKI — certificados y claves privadas, regenerables via ca-setup (docker compose)
+certs/
+
+# Estado del ledger — runtime, regenerable con scripts/reset.sh
+data/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Sistema operativo / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Overrides locales de Docker
+docker-compose.override.yml
+
+# Varios 
 *Zone.Identifier*

@@ -21,6 +21,7 @@ const { signPayload, verifySignature } = require("./lib/crypto-utils");
 const ledger = require("./lib/ledger");
 const { checkEndorsement } = require("./lib/endorsement");
 const { queryCompatible } = require("./lib/hla-matching");
+const { queryCase, getHealthSummary } = require("./lib/dashboard-projection");
 
 const ORG_NAME = process.env.ORG_NAME;
 const PORT = process.env.PORT || 3000;
@@ -227,6 +228,134 @@ app.post("/sign", (req, res) => {
   } catch (err) {
     res.status(500).json({ ok: false, reason: err.message });
   }
+});
+
+/**
+ * Dashboard: Consolidated case state projection
+ * GET /dashboard/casos/:id
+ *
+ * Returns consolidated view of a case (donor or recipient) with:
+ * - donorInfo: donor registry data
+ * - recipientInfo: patient waiting list data
+ * - assignmentInfo: organ assignment
+ * - custodyCheckpoints: telemetry during transport
+ *
+ * Access control: x-actor header must be self, auditor, or coordinador
+ */
+app.get("/dashboard/casos/:id", (req, res) => {
+  const actor = req.header("x-actor");
+  const caseId = req.params.id;
+
+  // Access control: allow self, auditor, and coordinators
+  const isAuthorized = actor === ORG_NAME || actor === "auditor" ||
+                       actor === "coordinador-nacional" || actor === "coordinador-provincial";
+
+  if (!isAuthorized) {
+    return res.status(403).json({
+      ok: false,
+      reason: `Actor "${actor || "(sin identificar)"}" no autorizado a consultar dashboard`,
+    });
+  }
+
+  const caseData = queryCase(ledger.readLedger(), caseId);
+  if (!caseData.found) {
+    return res.status(404).json({ ok: false, reason: caseData.reason });
+  }
+
+  res.json({ ok: true, ...caseData });
+});
+
+/**
+ * Dashboard: Timeline of events for a case
+ * GET /dashboard/casos/:id/timeline
+ *
+ * Returns ordered list of all transactions affecting the case with:
+ * - timestamp, type (donor-registry|waiting-list|assignment|custody)
+ * - action (human-readable summary)
+ * - actors (which organizations co-signed)
+ * - hash (shortened for display, fullHash available)
+ * - payloadSummary (relevant fields only)
+ */
+app.get("/dashboard/casos/:id/timeline", (req, res) => {
+  const actor = req.header("x-actor");
+  const caseId = req.params.id;
+
+  const isAuthorized = actor === ORG_NAME || actor === "auditor" ||
+                       actor === "coordinador-nacional" || actor === "coordinador-provincial";
+
+  if (!isAuthorized) {
+    return res.status(403).json({
+      ok: false,
+      reason: `Actor "${actor || "(sin identificar)"}" no autorizado a consultar dashboard`,
+    });
+  }
+
+  const caseData = queryCase(ledger.readLedger(), caseId);
+  if (!caseData.found) {
+    return res.status(404).json({ ok: false, reason: caseData.reason });
+  }
+
+  res.json({
+    ok: true,
+    caseId,
+    timeline: caseData.timeline,
+    eventCount: caseData.timeline.length,
+  });
+});
+
+/**
+ * Dashboard: Telemetry time series for a case
+ * GET /dashboard/casos/:id/telemetria
+ *
+ * Returns chronologically-ordered sensor readings from custody chain:
+ * - timestamp (when reading was recorded)
+ * - deviceId (IoT sensor identifier)
+ * - sensorType (temperature, humidity, etc.)
+ * - value and unit (temperature: 2.5°C, etc.)
+ */
+app.get("/dashboard/casos/:id/telemetria", (req, res) => {
+  const actor = req.header("x-actor");
+  const caseId = req.params.id;
+
+  const isAuthorized = actor === ORG_NAME || actor === "auditor" ||
+                       actor === "coordinador-nacional" || actor === "coordinador-provincial";
+
+  if (!isAuthorized) {
+    return res.status(403).json({
+      ok: false,
+      reason: `Actor "${actor || "(sin identificar)"}" no autorizado a consultar dashboard`,
+    });
+  }
+
+  const caseData = queryCase(ledger.readLedger(), caseId);
+  if (!caseData.found) {
+    return res.status(404).json({ ok: false, reason: caseData.reason });
+  }
+
+  res.json({
+    ok: true,
+    caseId,
+    telemetry: caseData.telemetry,
+    readingCount: caseData.telemetry.length,
+  });
+});
+
+/**
+ * Dashboard: Node health and recent activity
+ * GET /dashboard/health
+ *
+ * Returns:
+ * - ledgerBlocks: total block count
+ * - transactionsByType: count of each transaction type
+ * - recentTransactions: last 5 blocks with timestamp/type/hash
+ * - timestamp: current server time
+ *
+ * No access control (health check is public)
+ */
+app.get("/dashboard/health", (req, res) => {
+  const ledgerData = ledger.readLedger();
+  const health = getHealthSummary(ledgerData, ORG_NAME);
+  res.json(health);
 });
 
 async function replicateToPeers(block) {

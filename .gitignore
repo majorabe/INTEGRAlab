@@ -24,5 +24,16 @@ Thumbs.db
 # Overrides locales de Docker
 docker-compose.override.yml
 
+# Next.js — dashboard/
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+
+# Env locales del dashboard (si usás variables tipo AI_API_URL, base URLs de nodos, etc.)
+.env.local
+.env*.local
+
+
 # Varios 
 *Zone.Identifier*

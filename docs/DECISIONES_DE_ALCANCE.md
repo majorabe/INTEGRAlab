@@ -66,46 +66,37 @@ En producción (Hyperledger Fabric real), esta capa equivaldría a un indexador 
 
 **No duplica datos:** La proyección es transformación pura sobre el ledger en tiempo de lectura. No hay caché persistente ni base de datos secundaria.
 
-## 7. Dashboard Frontend (Fase 2) - Arquitectura de solo lectura sin identidad PKI para Auditor
+## 7. Dashboard Frontend (Fase 2) — UI de solo consulta
 
-Fase 2 implementa un frontend React/Next.js que consume los 4 endpoints de Fase 1 (GET /dashboard/*) más los endpoints de escritura ya existentes, con un selector de rol que cambia la identidad organizacional del cliente.
+El frontend en `dashboard/` **no escribe el ledger**. Consume únicamente GET de la proyección de Fase 1 (`/dashboard/casos/:id`, `/timeline`, `/telemetria`, `/dashboard/health`). No llama `/sign`, `/tx`, `/ledger` ni `/internal/*`.
 
-**Modelo de Roles:**
+El selector de rol elige **desde qué nodo se lee** (puertos 3001–3004), no un login de usuario ni una identidad extra.
 
-Los 5 roles del dashboard corresponden a identidades PKI reales (4 organizaciones + vista especial de IoT):
+**Roles de UI (organizaciones reales):**
 
-- **Coordinador Nacional** (cert: coordinador-nacional, puerto 3001) — gestiona lista de espera, emite asignaciones
-- **Coordinador Provincial** (cert: coordinador-provincial, puerto 3002) — endorsa transacciones
-- **Hospital Donante** (cert: hospital-donante, puerto 3003) — registra donantes, co-firma
-- **Hospital Receptor** (cert: hospital-receptor, puerto 3004) — confirma recepción, visualiza telemetría
-- **Dispositivo IoT** (sin interfaz de escritura, solo lectura de `/dashboard/casos/:id/telemetria`)
-- **Auditor Externo** (NO tiene certificado propio en Fase 2) — vista de solo lectura sin identidad criptográfica
+- Coordinador Nacional (3001)
+- Coordinador Provincial (3002)
+- Hospital Donante (3003)
+- Hospital Receptor (3004)
+- Vista IoT: solo telemetría, leyendo el nodo de custodia (hospital-donante). No es una org nueva.
 
-**Por qué Auditor sin certificado en Fase 2:**
+**Auditor no es un rol de UI.** No hay certificado de auditor en la PKI. El valor `x-actor: auditor` puede aparecer en tests del nodo; no se ofrece en el selector.
 
-El rol de Auditor requeriría un nuevo certificado en la jerarquía PKI (agregar una CA intermedia "auditor" a `ca/generate-ca-hierarchy.js`, nuevo puerto, nueva organización en docker-compose). Es infraestructura blockchain real que excede el alcance de Fase 2 (frontend).
+**Rutas:**
 
-Alternativa implementada: El rol de Auditor en el dashboard usa modo de **solo lectura sin identidad**, apuntando por defecto al nodo del Coordinador Nacional pero sin enviar header `x-actor` criptográfico. Los endpoints de lectura ya soportan esto (ver Fase 1 access control: `auditor` es un valor especial permitido en lectura).
+- `/` — puerta (infra vs consulta)
+- `/infra` — diagnóstico de nodos (fuera del dashboard clínico)
+- `/dashboard` — consulta clínica de solo lectura
 
-**Mejora incremental post-entrega:** Si la auditoría requiere una identidad formal (para repudio legal, etc.), se agrega el certificado de Auditor a la PKI — es un cambio puro de infraestructura sin tocar lógica de aplicación.
+**Por qué no hay escrituras en el front:** el valor del prototipo está en el ledger, la PKI y el endorsement. La UI es una proyección. Inventar o mutar datos desde React repetiría el error del INTEGRA-MVP simulado.
 
 **Seguridad en el cliente:**
 
-- El cliente NUNCA maneja claves privadas — todas las firmas se hacen en el backend
-- El selector de rol es equivalente a elegir con qué nodo (certificado) operás
-- Cada rol apunta a su puerto específico
-- Header `x-actor` se envía automáticamente (validado en el backend)
-- No hay sesiones de usuario — cada rol es una organización
+- El cliente no maneja claves privadas
+- Header `x-actor` = organización del nodo que se consulta (la vista IoT usa `hospital-donante` porque `iot` no está en el access control de los endpoints)
+- No hay sesiones de usuario
 
-**Codebase:**
-
-- Ubicación: `dashboard/` (carpeta separada del repo)
-- Framework: Next.js 14 + React 18 + TypeScript
-- Styling: Tailwind CSS + shadcn/ui
-- Gráficos: Recharts (para telemetría)
-- API client: Clase `APIClient` que encapsula llamadas a Fase 1 + endpoints de escritura
-
-Ver `dashboard/README.md` para detalles de arquitectura, desarrollo, y roadmap.
+Ver `dashboard/lib/read-client.ts`.
 
 ## 8. Convención de nombres para test data (Fase 2 dashboard development)
 

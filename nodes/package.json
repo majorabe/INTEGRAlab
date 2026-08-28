@@ -1,14 +1,25 @@
 {
-  "name": "integra-node",
+  "name": "integra-blockchain",
   "version": "1.0.0",
-  "description": "Nodo de organizacion INTEGRA (ledger + validacion + endorsement)",
-  "main": "server.js",
+  "description": "Blockchain-based organ donation management system with PKI, HLA compatibility, and security controls",
+  "main": "nodes/server.js",
   "scripts": {
-    "start": "node server.js"
+    "test:seguridad": "node tests/run-tests.js",
+    "refresh-certs": "docker compose run ca-setup"
   },
+  "keywords": [
+    "blockchain",
+    "organ-donation",
+    "healthcare",
+    "pki",
+    "x509"
+  ],
+  "author": "",
+  "license": "MIT",
   "dependencies": {
-    "express": "^4.19.2",
-    "node-forge": "^1.3.1",
-    "axios": "^1.7.2"
+    "axios": "^1.4.0",
+    "crypto": "^1.0.1",
+    "express": "^4.18.2",
+    "node-forge": "^1.3.0"
   }
 }

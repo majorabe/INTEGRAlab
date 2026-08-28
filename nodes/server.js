@@ -77,6 +77,31 @@ const app = express();
 app.use(express.json());
 
 /**
+ * CORS para el panel de infraestructura del dashboard (`http://localhost:3000/infra`).
+ * Sin esto, el fetch directo desde el navegador falla con un TypeError genérico
+ * ("Failed to fetch") y no se puede distinguir un nodo caído de un bloqueo CORS.
+ * Solo se abre el origen del dashboard local — no es un CORS wildcard.
+ */
+const DASHBOARD_ORIGINS = new Set([
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+]);
+
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && DASHBOARD_ORIGINS.has(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-actor");
+    res.setHeader("Vary", "Origin");
+  }
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(204);
+  }
+  next();
+});
+
+/**
  * Middleware de autenticación para endpoints /internal/*
  * Protege contra inyección de bloques desde atacantes externos.
  */
@@ -88,8 +113,25 @@ app.use('/internal', (req, res, next) => {
   next();
 });
 
+/**
+ * Salud cruda del nodo (panel `/infra` y waitForStack de los tests).
+ * Campos extra (ledgerHeight, tipHash) son backward-compatible: los tests
+ * existentes solo chequean HTTP 200.
+ */
 app.get("/health", (req, res) => {
-  res.json({ org: ORG_NAME, status: "ok", peers: PEERS });
+  const blocks = ledger.readLedger();
+  const tip = blocks.length ? blocks[blocks.length - 1] : null;
+  res.json({
+    org: ORG_NAME,
+    status: "ok",
+    peers: PEERS,
+    isOrderer: IS_ORDERER,
+    ledgerHeight: blocks.length,
+    tipIndex: tip ? tip.index : null,
+    tipHash: tip ? tip.hash : null,
+    tipTimestamp: tip ? tip.timestamp : null,
+    timestamp: new Date().toISOString(),
+  });
 });
 
 /**

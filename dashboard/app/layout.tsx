@@ -2,8 +2,8 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'INTEGRAlab Dashboard',
-  description: 'Dashboard para coordinación de trasplantes con blockchain',
+  title: 'INTEGRAlab',
+  description: 'Consulta clínica y diagnóstico de infraestructura sobre ledger real',
 }
 
 export default function RootLayout({
@@ -13,9 +13,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es">
-      <body className="bg-slate-50">
-        {children}
-      </body>
+      <body>{children}</body>
     </html>
   )
 }

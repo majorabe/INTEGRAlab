@@ -92,7 +92,6 @@ Componentes: TelemetryChart, CaseDetail
 | **coordinador-provincial** | 3002 | Validar/endorsar, ver casos provincia | ⏳ |
 | **hospital-donante** | 3003 | Registrar donantes, co-firmar asignaciones | ⏳ |
 | **hospital-receptor** | 3004 | Ver casos asignados, confirmar recepción | ⏳ |
-| **auditor** | 3001 (read-only) | Query multi-nodo, auditoría ledger | ⏳ |
 | **iot** | N/A | Solo lectura: /dashboard/casos/:id/telemetria | ⏳ |
 
 ---
@@ -289,7 +288,6 @@ npm run lint
 - [ ] Coordinador Provincial: Endorsar transacciones
 - [ ] Hospital Donante: Registrar donantes
 - [ ] Hospital Receptor: Ver asignados, confirmar
-- [ ] Auditor: Query multi-nodo
 - [ ] IoT: Solo lectura telemetría
 
 #### Páginas Dinámicas
@@ -300,7 +298,6 @@ npm run lint
 #### Funcionalidades
 - [ ] Formularios: registro, asignación, confirmación
 - [ ] Tabla de honestidad/transparencia
-- [ ] Dashboard auditoría
 - [ ] Tests end-to-end
 
 ---

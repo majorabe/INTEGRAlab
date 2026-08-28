@@ -1,111 +1,87 @@
 /**
- * Configuración de roles para el dashboard
- * Cada rol corresponde a una organización real con certificado X.509
+ * Roles del dashboard clínico = organizaciones reales (MSP).
+ * El selector elige DESDE QUÉ NODO se lee la proyección. No firma ni escribe.
  */
 
 import { RoleConfig, RoleType } from './types'
+
+export const NODE_URLS: Record<RoleType, string> = {
+  'coordinador-nacional': 'http://localhost:3001',
+  'coordinador-provincial': 'http://localhost:3002',
+  'hospital-donante': 'http://localhost:3003',
+  'hospital-receptor': 'http://localhost:3004',
+  iot: 'http://localhost:3003',
+}
 
 export const ROLE_CONFIGS: Record<RoleType, RoleConfig> = {
   'coordinador-nacional': {
     id: 'coordinador-nacional',
     name: 'Coordinador Nacional',
-    description: 'Gestiona lista de espera nacional, emite asignaciones',
+    description: 'Lectura del caso completo y timeline',
     port: 3001,
-    color: 'bg-blue-600',
-    permissions: [
-      'view-all-cases',
-      'manage-waiting-list',
-      'create-assignment',
-      'endorse-transactions',
-    ],
+    color: 'bg-teal-800',
+    permissions: ['view-all-cases', 'view-timeline'],
   },
   'coordinador-provincial': {
     id: 'coordinador-provincial',
     name: 'Coordinador Provincial',
-    description: 'Aprueba transacciones a nivel provincial',
+    description: 'Lectura del caso y timeline',
     port: 3002,
-    color: 'bg-cyan-600',
-    permissions: [
-      'view-provincial-cases',
-      'endorse-transactions',
-      'view-waiting-list',
-    ],
+    color: 'bg-cyan-800',
+    permissions: ['view-all-cases', 'view-timeline'],
   },
   'hospital-donante': {
     id: 'hospital-donante',
     name: 'Hospital Donante',
-    description: 'Registra donantes, endorsa asignaciones',
+    description: 'Lectura de registro de donante y asignación',
     port: 3003,
-    color: 'bg-green-600',
-    permissions: [
-      'register-donor',
-      'endorse-transactions',
-      'manage-custody',
-      'record-telemetry',
-    ],
+    color: 'bg-emerald-800',
+    permissions: ['view-donor', 'view-assignment'],
   },
   'hospital-receptor': {
     id: 'hospital-receptor',
     name: 'Hospital Receptor',
-    description: 'Confirma recepción de órgano, monitorea isquemia',
+    description: 'Lectura de asignación, custodia y telemetría',
     port: 3004,
-    color: 'bg-purple-600',
-    permissions: [
-      'view-assigned-cases',
-      'confirm-reception',
-      'endorse-transactions',
-      'view-telemetry',
-    ],
+    color: 'bg-sky-800',
+    permissions: ['view-assignment', 'view-telemetry'],
   },
   iot: {
     id: 'iot',
-    name: 'Dispositivo IoT',
-    description: 'Vista de solo lectura: monitoreo de telemetría durante transporte',
+    name: 'Vista IoT',
+    description: 'Solo telemetría del nodo de custodia',
     port: 3003,
-    color: 'bg-orange-600',
+    color: 'bg-amber-700',
     permissions: ['view-telemetry'],
-  },
-  auditor: {
-    id: 'auditor',
-    name: 'Auditor Externo',
-    description: 'Vista de solo lectura: auditoría de toda la red',
-    port: 3001,
-    color: 'bg-red-600',
-    permissions: [
-      'view-all-cases',
-      'view-all-nodes',
-      'view-ledger-integrity',
-      'export-audit-reports',
-    ],
   },
 }
 
-/**
- * Obtener configuración de rol
- */
 export function getRoleConfig(role: RoleType): RoleConfig {
   return ROLE_CONFIGS[role]
 }
 
-/**
- * Obtener lista de roles disponibles (excluir IoT de la selección principal,
- * ya que es una vista especial)
- */
 export function getAvailableRoles(): RoleType[] {
-  return ['coordinador-nacional', 'coordinador-provincial', 'hospital-donante', 'hospital-receptor', 'auditor']
+  return ['coordinador-nacional', 'coordinador-provincial', 'hospital-donante', 'hospital-receptor', 'iot']
 }
 
 /**
- * Verificar si un rol tiene permiso para hacer algo
+ * Header x-actor enviado al nodo.
+ * La vista IoT no es una org del access control: lee el nodo de custodia
+ * identificándose como hospital-donante (el nodo que ingiere telemetría).
  */
-export function hasPermission(role: RoleType, permission: string): boolean {
-  return ROLE_CONFIGS[role].permissions.includes(permission)
+export function actorHeaderForRole(role: RoleType): string {
+  return role === 'iot' ? 'hospital-donante' : role
 }
 
-/**
- * Obtener URL del nodo para un rol
- */
 export function getRoleNodeURL(role: RoleType): string {
-  const port = ROLE_CONFIGS[role].port
-  return `http://localhost:${port}`
+  return NODE_URLS[role]
+}
+
+export type CaseFocus = 'full' | 'donor' | 'custody' | 'telemetry'
+
+export function caseFocusForRole(role: RoleType): CaseFocus {
+  if (role === 'iot') return 'telemetry'
+  if (role === 'hospital-receptor') return 'custody'
+  if (role === 'hospital-donante') return 'donor'
+  return 'full'
 }

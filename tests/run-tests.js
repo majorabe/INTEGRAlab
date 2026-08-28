@@ -1,7 +1,8 @@
 /**
  * Test Runner para INTEGRA Security Test Suite
- * Ejecuta 18 tests organizados en 7 bloques (A-G)
- * Mapea amenazas STRIDE a controles de seguridad implementados en Paso 1-2
+ * Ejecuta 19 tests organizados en 8 bloques (A-H)
+ * Bloques A-G: Paso 1-2 (Criptografía, Endorsement, IoT, RBAC, Resiliencia, Auditoría)
+ * Bloque H: Fase 3-4 (Quorum de Replicación)
  */
 
 const path = require('path');
@@ -60,6 +61,12 @@ const TEST_BLOCKS = [
     name: 'Block G: Trazabilidad y Auditoría',
     tests: [
       'trazabilidad/test18-auditoriaFirmasE2E.js',
+    ],
+  },
+  {
+    name: 'Block H: Quorum de Replicación (Fase 3-4)',
+    tests: [
+      'red-quorum/test19-quorumWithDownPeers.js',
     ],
   },
 ];

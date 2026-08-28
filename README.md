@@ -110,6 +110,26 @@ bash run-all-tests.sh
 
 ---
 
+## Mantenimiento — Certificados IoT
+
+Los certificados de dispositivos IoT tienen un TTL de 72 horas por diseño (ver
+`docs/INTEGRA_Paso2_Arquitectura.docx` §3.2 — rotación de credenciales como control
+de seguridad, no un descuido). Antes de trabajar en el proyecto o de hacer una demo,
+si pasaron más de 3 días desde la última vez, corré:
+
+\`\`\`bash
+npm run refresh-certs
+\`\`\`
+
+Esto regenera toda la jerarquía de PKI (Root CA, CAs intermedias, certs de organización
+e IoT). Después, confirmá que todo sigue funcionando con:
+
+\`\`\`bash
+npm run test:seguridad
+\`\`\`
+
+
+
 ## ✅ Fase 1: Backend (COMPLETO)
 
 ### Características Implementadas
@@ -395,17 +415,6 @@ bash run-all-tests.sh
 # 4. Selector rol → cambiar de rol
 # 5. Verificar que endpoints se llamar correctamente
 ```
-
----
-
-## 📞 Contacto & Colaboración
-
-Proyecto académico para Concurso de Innovación Tecnológica 2025.
-
-**Objetivos de Replicación:**
-- Brasil: Sistema SNT (Serviço Nacional de Transplantes)
-- México: Sistema CENATRA (Centro Nacional de Trasplante)
-- Proteja datos sensibles (HLA, GPS) con blockchain distribuido
 
 ---
 

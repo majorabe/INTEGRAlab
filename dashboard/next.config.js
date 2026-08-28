@@ -9,6 +9,12 @@ const nextConfig = {
   env: {
     NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001',
   },
+  async redirects() {
+    return [
+      { source: '/casos', destination: '/dashboard/casos', permanent: true },
+      { source: '/casos/:id', destination: '/dashboard/casos/:id', permanent: true },
+    ]
+  },
 }
 
 module.exports = nextConfig

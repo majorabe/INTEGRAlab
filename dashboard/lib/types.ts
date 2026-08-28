@@ -3,7 +3,7 @@
  * Basados en los endpoints de Fase 1
  */
 
-export type RoleType = 'coordinador-nacional' | 'coordinador-provincial' | 'hospital-donante' | 'hospital-receptor' | 'iot' | 'auditor'
+export type RoleType = 'coordinador-nacional' | 'coordinador-provincial' | 'hospital-donante' | 'hospital-receptor' | 'iot'
 
 export interface RoleConfig {
   id: RoleType

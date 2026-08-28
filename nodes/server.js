@@ -30,6 +30,44 @@ const PEERS = (process.env.PEERS || "")
   .map((p) => p.trim())
   .filter(Boolean);
 
+/**
+ * IS_ORDERER: Rol de este nodo en la arquitectura de ordenamiento.
+ *
+ * Fase 3-4 Spec (Ordenamiento Global):
+ * - coordinador-nacional: IS_ORDERER=true → recibe transacciones, crea bloques únicos, replica
+ * - otros nodos: IS_ORDERER=false → validan endorsement localmente, reenvían a orderer
+ *
+ * Esto previene fork de multi-origen: todos los bloques pasan por coordinador-nacional,
+ * que es la autoridad central de ordenamiento (análogo a Raft con líder fijo).
+ * Elección dinámica de líder será Fase posterior.
+ */
+const IS_ORDERER = process.env.IS_ORDERER === 'true' || false;
+
+/**
+ * ORDERER_URL: URL del nodo ordenador único (coordinador-nacional).
+ * Usado por non-orderers para reenviar transacciones.
+ */
+const ORDERER_URL = process.env.ORDERER_URL || 'http://coordinador-nacional:3000';
+
+/**
+ * QUORUM_NODOS: Requerimiento de replicación exitosa para confirmar transacción.
+ *
+ * Relación con endorsement (Paso 2, Tabla 2):
+ * - Endorsement de negocio: 2 organizaciones deben firmar (capa aplicación)
+ * - Quorum de red: 3 de 4 nodos deben confirmar replicación (capa infraestructura)
+ *
+ * Tolerancia a fallos: 1 nodo puede estar caído sin bloquear transacciones.
+ * Con 4 nodos totales: 1 (local) + 2 (replicación exitosa) = 3 ✓ QUORUM
+ */
+const QUORUM_NODOS = 3;
+
+/**
+ * INTERNAL_TOKEN: Autenticación nodo-a-nodo para endpoints /internal/*
+ * Evita que un atacante externo inyecte bloques falsificados.
+ * Compartido entre los 4 nodos vía variable de entorno (INTERNAL_TOKEN).
+ */
+const INTERNAL_TOKEN = process.env.INTERNAL_TOKEN || 'default-insecure-token-change-in-prod';
+
 if (!ORG_NAME) {
   console.error("Falta la variable de entorno ORG_NAME. Abortando.");
   process.exit(1);
@@ -37,6 +75,18 @@ if (!ORG_NAME) {
 
 const app = express();
 app.use(express.json());
+
+/**
+ * Middleware de autenticación para endpoints /internal/*
+ * Protege contra inyección de bloques desde atacantes externos.
+ */
+app.use('/internal', (req, res, next) => {
+  const token = req.header('X-Internal-Token');
+  if (token !== INTERNAL_TOKEN) {
+    return res.status(401).json({ ok: false, reason: 'Unauthorized' });
+  }
+  next();
+});
 
 app.get("/health", (req, res) => {
   res.json({ org: ORG_NAME, status: "ok", peers: PEERS });
@@ -71,6 +121,12 @@ app.post("/tx/:type", async (req, res) => {
  * custodiante, cumpliendo así la política de endorsement de CustodyChain
  * (firma de dispositivo IoT + endorsement de un hospital) sin que el
  * sensor tenga que gestionar credenciales de ninguna organización.
+ *
+ * FASE 3-4: También respeta la bifurcación IS_ORDERER
+ * - Si IS_ORDERER=true: procesa localmente (hospital tiene autoridad)
+ * - Si IS_ORDERER=false: reenvía a coordinador-nacional (pero esto está
+ *   documentado como pendiente — hoy el IoT simulator escribe directo a
+ *   hospital-donante sin pasar por orderer)
  */
 app.post("/custody/ingest", async (req, res) => {
   const { payload, deviceActor, deviceSignature } = req.body || {};
@@ -95,13 +151,37 @@ app.post("/custody/ingest", async (req, res) => {
 });
 
 /**
- * Lógica común de validación + endorsement + append + replicación,
- * compartida por /tx/:type y /custody/ingest.
+ * Lógica común de validación + endorsement + replicación + append.
+ *
+ * FASE 3-4: ORDENAMIENTO GLOBAL (Paso 2)
+ *
+ * BIFURCACIÓN POR IS_ORDERER:
+ *
+ * Si IS_ORDERER=true (coordinador-nacional):
+ *   1. Verificar firmas de endorsement (capa negocio)
+ *   2. Verificar política de endorsement (capa negocio)
+ *   3. Construir bloque con índice único (autoridad central)
+ *   4. INTENTAR REPLICAR a peers ANTES de persistir localmente
+ *   5. Contar votos: 1 (local) + peers confirmados
+ *   6. Si votos >= QUORUM_NODOS → persistir + 201 éxito
+ *   7. Si votos < QUORUM_NODOS → NO persistir + 503 sin quorum
+ *
+ * Si IS_ORDERER=false (otros nodos):
+ *   1. Verificar firmas de endorsement (capa negocio)
+ *   2. Verificar política de endorsement (capa negocio)
+ *   3. Reenviar a /internal/order-and-replicate del orderer
+ *   4. Devolver respuesta del orderer al cliente
+ *
+ * Esto previene fork de multi-origen: todas las transacciones pasan por
+ * coordinador-nacional, que es la autoridad de ordenamiento (Fase 1).
  */
 async function submitTransaction(txType, payload, signatures) {
   const validOrgs = [];
   const invalidReasons = [];
 
+  console.log(`[${ORG_NAME}] submitTransaction: txType=${txType}, sigCount=${signatures?.length || 0}, isOrderer=${IS_ORDERER}`);
+
+  // PASO COMÚN 1: Verificar firmas (capa negocio)
   for (const sig of signatures) {
     if (!sig.actor || !sig.signature) {
       invalidReasons.push("Cada firma requiere { actor, signature }");
@@ -119,19 +199,91 @@ async function submitTransaction(txType, payload, signatures) {
     return { status: 401, body: { ok: false, reason: "Firma(s) inválida(s)", details: invalidReasons } };
   }
 
+  // PASO COMÚN 2: Verificar endorsement (capa negocio)
   const endorsement = checkEndorsement(txType, validOrgs, payload);
   if (!endorsement.ok) {
     return { status: 403, body: { ok: false, reason: endorsement.reason } };
   }
 
-  const block = ledger.buildNextBlock({ txType, payload, signatures });
-  const appendResult = ledger.appendBlock(block);
-  if (!appendResult.ok) {
-    return { status: 409, body: { ok: false, reason: appendResult.reason } };
-  }
+  // BIFURCACIÓN: IS_ORDERER
+  if (IS_ORDERER) {
+    // ===== ORDERER LOGIC (coordinador-nacional) =====
+    console.log(`[${ORG_NAME}] ORDERER LOGIC: creando bloque localmente`);
 
-  const replication = await replicateToPeers(block);
-  return { status: 201, body: { ok: true, block, replication } };
+    // PASO 3: Construir bloque (pendiente persistencia)
+    const block = ledger.buildNextBlock({ txType, payload, signatures, validOrgs });
+
+    // PASO 4: Intentar replicar ANTES de persistir (capa infraestructura)
+    const replication = await replicateToPeers(block);
+
+    // PASO 5: Contar votos
+    const successfulPeers = replication.filter(r => r.ok).length;
+    const totalVotes = 1 + successfulPeers;
+
+    console.log(`[${ORG_NAME}] QUORUM DEBUG: txType=${txType}, successfulPeers=${successfulPeers}, totalVotes=${totalVotes}, QUORUM_NODOS=${QUORUM_NODOS}, condition (totalVotes >= QUORUM_NODOS) = ${totalVotes >= QUORUM_NODOS}`);
+
+    // PASO 6-7: Decisión por quorum
+    if (totalVotes >= QUORUM_NODOS) {
+      // Quorum alcanzado → persistir localmente y confirmar al cliente
+      const appendResult = await ledger.appendBlock(block);
+      if (!appendResult.ok) {
+        return { status: 409, body: { ok: false, reason: appendResult.reason } };
+      }
+      return {
+        status: 201,
+        body: {
+          ok: true,
+          block,
+          replication,
+          quorum: { votes: totalVotes, required: QUORUM_NODOS, status: "PASSED" }
+        }
+      };
+    } else {
+      // Quorum NO alcanzado → NO persistir, rechazar transacción
+      return {
+        status: 503,
+        body: {
+          ok: false,
+          reason: `No se alcanzó quorum de red: ${totalVotes}/${QUORUM_NODOS} nodos confirmaron replicación`,
+          replication,
+          quorum: { votes: totalVotes, required: QUORUM_NODOS, status: "FAILED" }
+        }
+      };
+    }
+  } else {
+    // ===== NON-ORDERER LOGIC (otros nodos) =====
+    console.log(`[${ORG_NAME}] NON-ORDERER LOGIC: reenviando a orderer en ${ORDERER_URL}`);
+
+    try {
+      // Preparar bloque sin persistir (solo para validación en orderer)
+      const block = ledger.buildNextBlock({ txType, payload, signatures, validOrgs });
+
+      // Reenviar al orderer
+      const ordererResponse = await axios.post(
+        `${ORDERER_URL}/internal/order-and-replicate`,
+        { block, nonOrdererOrg: ORG_NAME },
+        {
+          timeout: 10000,
+          headers: { 'X-Internal-Token': INTERNAL_TOKEN }
+        }
+      );
+
+      // Devolver respuesta del orderer al cliente
+      return {
+        status: ordererResponse.status || 201,
+        body: ordererResponse.data
+      };
+    } catch (err) {
+      console.error(`[${ORG_NAME}] Error reenviando a orderer:`, err.message);
+      return {
+        status: err.response?.status || 503,
+        body: {
+          ok: false,
+          reason: err.response?.data?.reason || `No se pudo contactar al orderer: ${err.message}`
+        }
+      };
+    }
+  }
 }
 
 /**
@@ -140,11 +292,17 @@ async function submitTransaction(txType, payload, signatures) {
  * verifica el encadenamiento con el último bloque local, y vuelve a
  * verificar cada firma. Esto es lo que garantiza que ningún nodo pueda
  * imponer unilateralmente una versión falsa del ledger a los demás.
+ *
+ * SEGURIDAD (Fase 3-4):
+ * - Verifica que las firmas coincidan exactamente con endorsedBy
+ * - Revalida la política de endorsement
+ * - Detecta intentos de reemplazar firmas con otra combinación válida
  */
-app.post("/internal/replicate", (req, res) => {
+app.post("/internal/replicate", async (req, res) => {
   const { block } = req.body || {};
   if (!block) return res.status(400).json({ ok: false, reason: "Falta el bloque" });
 
+  // PASO 1: Verificar firmas criptográficas
   for (const sig of block.signatures || []) {
     const result = verifySignature(sig.actor, block.payload, sig.signature);
     if (!result.valid) {
@@ -152,11 +310,146 @@ app.post("/internal/replicate", (req, res) => {
     }
   }
 
-  const appendResult = ledger.appendBlock(block);
+  // PASO 2: Verificar que los actores que firmaron sean exactamente los endosados
+  const actualActors = (block.signatures || []).map(sig => sig.actor).sort();
+  const expectedActors = (block.endorsedBy || []).sort();
+
+  console.log(`[${ORG_NAME}] /internal/replicate: txType=${block.txType}, actualActors=[${actualActors.join(',')}], expectedActors=[${expectedActors.join(',')}]`);
+
+  if (JSON.stringify(actualActors) !== JSON.stringify(expectedActors)) {
+    console.log(`[${ORG_NAME}] REPLICATE FAILED: endorsedBy mismatch`);
+    return res.status(403).json({
+      ok: false,
+      reason: `Actores que firmaron no coinciden con endorsedBy. ` +
+              `Esperado: ${expectedActors.join(', ')}, ` +
+              `Recibido: ${actualActors.join(', ')}`
+    });
+  }
+
+  // PASO 3: Revalidar política de endorsement
+  const endorsement = checkEndorsement(block.txType, actualActors, block.payload);
+  if (!endorsement.ok) {
+    return res.status(403).json({
+      ok: false,
+      reason: `Política de endorsement no cumplida al replicar: ${endorsement.reason}`
+    });
+  }
+
+  // PASO 4: Validar estructura del bloque (prevHash, encadenamiento, hash)
+  const appendResult = await ledger.appendBlock(block);
   if (!appendResult.ok) {
     return res.status(409).json({ ok: false, reason: appendResult.reason });
   }
   return res.status(201).json({ ok: true });
+});
+
+/**
+ * ENDPOINT ORDERER: /internal/order-and-replicate
+ *
+ * FASE 3-4 (Paso 2): Ordenamiento Global
+ *
+ * Solo disponible en coordinador-nacional (IS_ORDERER=true).
+ * Recibe bloques pre-construidos desde non-orderers, los revalida,
+ * y los replica a todos los peers. Esto garantiza que TODOS los
+ * bloques cruzarán por coordinador-nacional, previniendo fork de
+ * multi-origen.
+ *
+ * Flujo:
+ * 1. Non-orderer recibe POST /tx/:type, valida endorsement localmente
+ * 2. Non-orderer reenvía a coordinador-nacional /internal/order-and-replicate
+ * 3. Coordinador-nacional revalida endorsement (defensa profunda)
+ * 4. Coordinador-nacional construye bloque con índice único
+ * 5. Coordinador-nacional replica a los 3 peers
+ * 6. Coordinador-nacional persiste localmente si quorum >= 3
+ * 7. Coordinador-nacional responde al non-orderer
+ * 8. Non-orderer responde al cliente original
+ */
+app.post("/internal/order-and-replicate", async (req, res) => {
+  if (!IS_ORDERER) {
+    return res.status(403).json({
+      ok: false,
+      reason: "Este endpoint solo está disponible en el ordenador (coordinador-nacional)"
+    });
+  }
+
+  const { block, nonOrdererOrg } = req.body || {};
+  if (!block) return res.status(400).json({ ok: false, reason: "Falta el bloque" });
+
+  console.log(`[${ORG_NAME}] ORDERER: recibido bloque desde ${nonOrdererOrg}, txType=${block.txType}`);
+
+  // DEFENSA PROFUNDA: Revalidar todas las firmas
+  for (const sig of block.signatures || []) {
+    const result = verifySignature(sig.actor, block.payload, sig.signature);
+    if (!result.valid) {
+      return res.status(401).json({
+        ok: false,
+        reason: `Firma inválida en orden-and-replicate: ${result.reason}`
+      });
+    }
+  }
+
+  // Verificar que los actores que firmaron sean exactamente los endosados
+  const actualActors = (block.signatures || []).map(sig => sig.actor).sort();
+  const expectedActors = (block.endorsedBy || []).sort();
+
+  if (JSON.stringify(actualActors) !== JSON.stringify(expectedActors)) {
+    return res.status(403).json({
+      ok: false,
+      reason: `Actores que firmaron no coinciden con endorsedBy en order-and-replicate`
+    });
+  }
+
+  // Revalidar política de endorsement
+  const endorsement = checkEndorsement(block.txType, actualActors, block.payload);
+  if (!endorsement.ok) {
+    return res.status(403).json({
+      ok: false,
+      reason: `Política de endorsement no cumplida en order-and-replicate: ${endorsement.reason}`
+    });
+  }
+
+  // CRÍTICO: El ORDERER construye su propio bloque con índice único (no usa el del non-orderer)
+  // Esto garantiza que el índice corresponde al ledger del ordenador, no al del non-orderer
+  const ordererBlock = ledger.buildNextBlock({
+    txType: block.txType,
+    payload: block.payload,
+    signatures: block.signatures,
+    validOrgs: actualActors  // Usar los actores validados
+  });
+
+  console.log(`[${ORG_NAME}] ORDERER: construido bloque con índice=${ordererBlock.index}, txType=${ordererBlock.txType}`);
+
+  // EL ORDERER REPLICA A LOS PEERS (con su propio bloque)
+  const replication = await replicateToPeers(ordererBlock);
+
+  // Contar votos
+  const successfulPeers = replication.filter(r => r.ok).length;
+  const totalVotes = 1 + successfulPeers;
+
+  console.log(`[${ORG_NAME}] ORDERER QUORUM: txType=${ordererBlock.txType}, votes=${totalVotes}/${QUORUM_NODOS}`);
+
+  // Decisión por quorum
+  if (totalVotes >= QUORUM_NODOS) {
+    // Quorum alcanzado → persistir localmente
+    const appendResult = await ledger.appendBlock(ordererBlock);
+    if (!appendResult.ok) {
+      return res.status(409).json({ ok: false, reason: appendResult.reason });
+    }
+    return res.status(201).json({
+      ok: true,
+      block: ordererBlock,
+      replication,
+      quorum: { votes: totalVotes, required: QUORUM_NODOS, status: "PASSED" }
+    });
+  } else {
+    // Quorum NO alcanzado → NO persistir
+    return res.status(503).json({
+      ok: false,
+      reason: `No se alcanzó quorum de red en orderer: ${totalVotes}/${QUORUM_NODOS}`,
+      replication,
+      quorum: { votes: totalVotes, required: QUORUM_NODOS, status: "FAILED" }
+    });
+  }
 });
 
 /**
@@ -362,7 +655,10 @@ async function replicateToPeers(block) {
   const results = [];
   for (const peerUrl of PEERS) {
     try {
-      await axios.post(`${peerUrl}/internal/replicate`, { block }, { timeout: 5000 });
+      await axios.post(`${peerUrl}/internal/replicate`, { block }, {
+        timeout: 5000,
+        headers: { 'X-Internal-Token': INTERNAL_TOKEN }
+      });
       results.push({ peer: peerUrl, ok: true });
     } catch (err) {
       results.push({ peer: peerUrl, ok: false, reason: err.response?.data?.reason || err.message });

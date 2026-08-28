@@ -19,6 +19,8 @@ services:
       - PEERS=http://coordinador-provincial:3000,http://hospital-donante:3000,http://hospital-receptor:3000
       - CERTS_DIR=/certs
       - LEDGER_DATA_DIR=/data
+      - INTERNAL_TOKEN=integra-secure-token-2024-fc17d9e8b2c4a6f1
+      - IS_ORDERER=true
     volumes:
       - ./certs:/certs:ro
       - ./data/coordinador-nacional:/data
@@ -36,6 +38,7 @@ services:
       - PEERS=http://coordinador-nacional:3000,http://hospital-donante:3000,http://hospital-receptor:3000
       - CERTS_DIR=/certs
       - LEDGER_DATA_DIR=/data
+      - INTERNAL_TOKEN=integra-secure-token-2024-fc17d9e8b2c4a6f1
     volumes:
       - ./certs:/certs:ro
       - ./data/coordinador-provincial:/data
@@ -53,6 +56,7 @@ services:
       - PEERS=http://coordinador-nacional:3000,http://coordinador-provincial:3000,http://hospital-receptor:3000
       - CERTS_DIR=/certs
       - LEDGER_DATA_DIR=/data
+      - INTERNAL_TOKEN=integra-secure-token-2024-fc17d9e8b2c4a6f1
     volumes:
       - ./certs:/certs:ro
       - ./data/hospital-donante:/data
@@ -70,6 +74,7 @@ services:
       - PEERS=http://coordinador-nacional:3000,http://coordinador-provincial:3000,http://hospital-donante:3000
       - CERTS_DIR=/certs
       - LEDGER_DATA_DIR=/data
+      - INTERNAL_TOKEN=integra-secure-token-2024-fc17d9e8b2c4a6f1
     volumes:
       - ./certs:/certs:ro
       - ./data/hospital-receptor:/data

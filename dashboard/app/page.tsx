@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { RoleType, NodeHealth } from '@/lib/types'
 import { getAPIClient } from '@/lib/api-client'
 import { RoleSelector } from '@/components/RoleSelector'
@@ -221,14 +222,16 @@ export default function Home() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Button className="w-full" variant="default">
-                Ver Casos
+              <Link href="/casos" className="block">
+                <Button className="w-full" variant="default">
+                  Ver Casos
+                </Button>
+              </Link>
+              <Button className="w-full" variant="outline" disabled>
+                Nuevo Caso (Próximamente)
               </Button>
-              <Button className="w-full" variant="outline">
-                Nuevo Caso
-              </Button>
-              <Button className="w-full" variant="outline">
-                Buscar Compatibilidad
+              <Button className="w-full" variant="outline" disabled>
+                Buscar Compatibilidad (Próximamente)
               </Button>
 
               <div className="border-t pt-4 mt-4">

@@ -9,7 +9,7 @@ interface LedgerStats {
   totalBlocks: number
   totalTransactions: number
   txByType: Record<string, number>
-  recentTx: Array<{ type: string; timestamp: string; blockIndex: number }>
+  recentTx: Array<{ type: string; timestamp: string; hash: string }>
   lastUpdate: string
   error: string | null
 }
@@ -164,7 +164,9 @@ export default function EstadisticasPage() {
           <div className="space-y-2 max-h-64 overflow-y-auto">
             {stats.recentTx.slice(0, 10).map((tx, i) => (
               <div key={i} className="flex items-center justify-between text-sm p-2 rounded hover:bg-muted">
-                <span className="font-mono text-xs text-muted-foreground">#{tx.blockIndex}</span>
+                <span className="font-mono text-xs text-muted-foreground" title={tx.hash}>
+                  {tx.hash.slice(0, 10)}…
+                </span>
                 <span className="font-medium">{tx.type}</span>
                 <span className="text-xs text-muted-foreground">
                   {new Date(tx.timestamp).toLocaleTimeString('es-AR')}

@@ -25,10 +25,12 @@ export function IntegrityCheck() {
     try {
       const client = getReadClient(role)
       const response = await client.getNodeHealth()
+      const recent = response.recentTransactions ?? []
+      const tip = recent.length > 0 ? recent[recent.length - 1] : null
 
-      const valid = response.valid ?? true
-      const length = response.length ?? 0
-      const lastBlockHash = response.tipHash ?? null
+      const valid = response.status === 'ok'
+      const length = response.ledgerBlocks ?? 0
+      const lastBlockHash = tip?.hash ?? null
       const loadingTime = Date.now() - startTime
 
       setStatus({

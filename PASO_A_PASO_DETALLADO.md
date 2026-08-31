@@ -19,8 +19,10 @@ Levantar un **sistema de trasplantes en blockchain** con:
 ### 1.1 El Comando
 ```bash
 cd INTEGRAlab
-docker compose up --build
+./scripts/reset.sh --force //En caso de querer borrar todos los datos
+docker compose up --build -d
 ```
+-d = detached: contenedores arriba, prompt de vuelta. Logs: docker compose logs -f.
 
 ### 1.2 Qué Hace Exactamente
 
@@ -293,7 +295,7 @@ El puerto 3000 es donde corre **Next.js** (framework React). Cuando abres:
 └─────────────────────────────────────────┘
 
 ┌──────────────────┐  ┌──────────────────┐
-│ 🟢 Infraestructura │ │ 🔵 Dashboard     │
+│🟢Infraestructura │ │ 🔵 Dashboard     │
 │ Estado crudo de  │  │ clínico          │
 │ nodos            │  │ Proyección GET   │
 └──────────────────┘  └──────────────────┘

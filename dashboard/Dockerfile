@@ -14,6 +14,7 @@ FROM base AS builder
 COPY package*.json ./
 RUN npm ci
 COPY . .
+RUN mkdir -p public
 RUN npm run build
 
 # Runtime stage

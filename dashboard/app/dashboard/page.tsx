@@ -4,6 +4,7 @@ import { useState, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { HonestyTable } from '@/components/HonestyTable'
+import { IntegrityCheck } from '@/components/IntegrityCheck'
 import { DEV_DONOR_ID } from '@/lib/dev-fixtures'
 
 export default function DashboardHome() {
@@ -19,6 +20,8 @@ export default function DashboardHome() {
 
   return (
     <div className="space-y-8">
+      <IntegrityCheck />
+
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Consulta de casos</h1>
         <p className="text-sm text-muted-foreground mt-1 max-w-2xl">

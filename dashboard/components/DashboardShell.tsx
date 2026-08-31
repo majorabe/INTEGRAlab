@@ -40,6 +40,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const nav = [
     { href: '/dashboard', label: 'Inicio' },
     { href: '/dashboard/casos', label: 'Consultar caso' },
+    { href: '/dashboard/estadisticas', label: 'Estadísticas' },
   ]
 
   return (

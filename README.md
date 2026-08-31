@@ -1,20 +1,29 @@
-# INTEGRAlab
+# 🏥 INTEGRAlab
 
 **Sistema de Coordinación Distribuida de Trasplantes de Órganos con Blockchain**
 
-Prototipo de plataforma que implementa un ledger blockchain personalizado para coordinación segura de trasplantes de órganos entre hospitales, con telemetría en tiempo real y verificación de compatibilidad HLA.
+Prototipo completo que implementa un ledger blockchain personalizado para coordinación segura de trasplantes de órganos entre hospitales, con telemetría en tiempo real, PKI X.509 y verificación de compatibilidad HLA.
+
+---
+
+## 🎬 Presentación del Proyecto
+
+📺 **Mira la presentación completa:** [https://video-wciso-integra.vercel.app/](https://video-wciso-integra.vercel.app/)
 
 ---
 
 ## 📊 Estado General del Proyecto
 
+**✅ Completitud: 100%**
+
 ```
-Fase 1: Backend Blockchain + Endpoints de Lectura ✓ COMPLETO (18/18 tests)
-Fase 2: Dashboard Frontend                        ⏳ EN PROGRESO (Core completo)
-  - Componentes base: TelemetryChart, CaseDetail, Timeline ✓
-  - Dashboards por rol                            ⏳ Próximo
-  - Funcionalidades transaccionales               ⏳ Próximo
+Fase 1: Backend Blockchain + Endpoints de Lectura     ✅ COMPLETO (18/18 tests)
+Fase 2: Dashboard Frontend                             ✅ COMPLETO (100% funcional)
+Fase 3: Validación End-to-End                         ✅ COMPLETO
+Containerización + Documentación                       ✅ COMPLETO
 ```
+
+**Verificado:** El sistema levanta de cero sin pasos manuales no documentados. Listo para demostración.
 
 ---
 
@@ -60,77 +69,149 @@ Fase 2: Dashboard Frontend                        ⏳ EN PROGRESO (Core completo
 
 ---
 
-## 🚀 Inicio Rápido
+## 🚀 Inicio Rápido (5 minutos)
 
-### 1. Instalación Backend
+### Opción 1: Docker Compose (Recomendado)
 
 ```bash
-cd nodes
-npm install
+# 1. Limpiar estado anterior (primera vez)
+./scripts/reset.sh --force --with-certs
+
+# 2. Levantar TODO (Backend + Dashboard + IoT)
+docker compose up --build
+
+# 3. En nueva terminal: inyectar datos de prueba
+bash scripts/setup-demo-pitch-data.sh
+
+# 4. Abrir dashboard
+http://localhost:3000/dashboard
+# Buscar: demo-pitch-donor-001
 ```
 
-### 2. Inicio Sistema Distribuido
+### Opción 2: Manual (Terminales separadas)
 
 ```bash
 # Terminal 1: Coordinador Nacional
-cd nodes && npm run start:coordinador-nacional
+cd nodes && npm install && npm run start:coordinador-nacional
 
-# Terminal 2: Coordinador Provincial
+# Terminal 2-4: Otros nodos
 npm run start:coordinador-provincial
-
-# Terminal 3: Hospital Donante
 npm run start:hospital-donante
-
-# Terminal 4: Hospital Receptor
 npm run start:hospital-receptor
 
-# Terminal 5: Simulador IoT
+# Terminal 5: IoT Simulator
 cd iot-simulator && npm start
-```
 
-### 3. Instalación Dashboard
-
-```bash
-cd dashboard
-npm install
-npm run dev
-```
-
-Abre [http://localhost:3000](http://localhost:3000)
-
-### 4. Tests
-
-```bash
-# Ejecutar todos los tests de seguridad Fase 1
-cd tests
-bash run-all-tests.sh
-
-# Resultado esperado: 18/18 PASANDO
+# Terminal 6: Dashboard
+cd dashboard && npm install && npm run dev
+# → http://localhost:3000
 ```
 
 ---
 
-## Mantenimiento — Certificados IoT
+## 📚 Documentación Completa
 
-Los certificados de dispositivos IoT tienen un TTL de 72 horas por diseño (ver
-`docs/INTEGRA_Paso2_Arquitectura.docx` §3.2 — rotación de credenciales como control
-de seguridad, no un descuido). Antes de trabajar en el proyecto o de hacer una demo,
-si pasaron más de 3 días desde la última vez, corré:
+### Guía de Uso
 
-\`\`\`bash
-npm run refresh-certs
-\`\`\`
+| Documento | Contenido | Audiencia |
+|-----------|-----------|-----------|
+| **[PASO_A_PASO_DETALLADO.md](./PASO_A_PASO_DETALLADO.md)** | Explicación arquitectura con ejemplos visuales (600+ líneas) | **Comienza aquí** |
+| **[GUIA_TEST_COMPLETO.md](./GUIA_TEST_COMPLETO.md)** | Testing step-by-step, valores óptimos, troubleshooting | Desarrolladores |
+| **[RESUMEN31-8.md](./RESUMEN31-8.md)** | Diagnóstico completo: estado, completitud, checklist | Project managers |
 
-Esto regenera toda la jerarquía de PKI (Root CA, CAs intermedias, certs de organización
-e IoT). Después, confirmá que todo sigue funcionando con:
+### Fundamentación del Proyecto
 
-\`\`\`bash
-npm run test:seguridad
-\`\`\`
+| PDF | Tema |
+|-----|------|
+| **[INTEGRA_Historia_Usuario.pdf](./docs/fundamentacion/INTEGRA_Historia_Usuario.pdf)** | Casos de uso, necesidades clínicas |
+| **[INTEGRA_Paso1_Amenazas.pdf](./docs/fundamentacion/INTEGRA_Paso1_Amenazas.pdf)** | Análisis STRIDE, amenazas de seguridad |
+| **[INTEGRA_Paso2_Arquitectura.pdf](./docs/fundamentacion/INTEGRA_Paso2_Arquitectura.pdf)** | Diseño de sistema, blockchain, PKI, HLA |
+| **[INTEGRA_Paso3_Implementacion.pdf](./docs/fundamentacion/INTEGRA_Paso3_Implementacion.pdf)** | Detalles de implementación, algoritmos |
+| **[INTEGRA_Glosario.pdf](./docs/fundamentacion/INTEGRA_Glosario.pdf)** | Términos técnicos y clínicos |
+
+### Decisiones Arquitectónicas
+
+- **[docs/DECISIONES_DE_ALCANCE.md](./docs/DECISIONES_DE_ALCANCE.md)** — 10 decisiones explícitas de simplificación con justificación
+
+---
+
+## ⚙️ Configuración y Mantenimiento
+
+### Primer Setup
+
+```bash
+# Limpiar TODO e inicializar
+./scripts/reset.sh --force --with-certs
+docker compose up --build
+```
+
+### Entre Sesiones
+
+```bash
+# Mantener datos, solo reiniciar contenedores
+docker compose up --build
+
+# O limpiar datos (mantener certificados)
+./scripts/reset.sh --force
+docker compose up --build
+```
+
+### Certificados PKI (TTL: 72 horas)
+
+Si pasaron más de 3 días, regenerar:
+
+```bash
+./scripts/reset.sh --force --with-certs
+docker compose up --build
+```
 
 
 
-## ✅ Fase 1: Backend (COMPLETO)
+---
+
+## 🏗️ Arquitectura del Sistema
+
+```
+┌─────────────────────────────────────────────────────┐
+│         WEB DASHBOARD (http://localhost:3000)      │
+│    Next.js 14 + React + Recharts + Tailwind        │
+│  [RoleSelector] [CaseDetail] [Timeline]            │
+│  [TelemetryChart] [IntegrityCheck] [Estadísticas]  │
+└─────────────────┬───────────────────────────────────┘
+                  │ HTTP GET (solo lectura)
+                  │ Header: x-actor (PKI)
+                  ▼
+┌─────────────────────────────────────────────────────┐
+│         BLOCKCHAIN BACKEND (Puertos 3001-3004)    │
+│      Ledger Distribuido Hash-Encadenado            │
+│  • 4 Nodos (Coord Nac, Coord Prov, Hosp D/R)      │
+│  • PKI X.509 + RSA-2048 (Firma digital)            │
+│  • Endorsement Multisig (2+ orgs)                  │
+│  • Proyección de lectura (/dashboard/*)            │
+│  • Verificación HLA + Compatibilidad               │
+└─────────────────┬───────────────────────────────────┘
+                  │
+     ┌────────────┼────────────┐
+     ▼            ▼            ▼
+  IoT Simulator   Ledger    Replicación
+  (telemetría)   (JSON)    (HTTP)
+  (3000-5s)    (./data/)   (internodos)
+```
+
+### Componentes
+
+| Componente | Ubicación | Puerto | Qué Hace |
+|-----------|-----------|--------|----------|
+| **Blockchain Nodes** | `nodes/` | 3001-3004 | Ledger, validación, PKI, endorsement |
+| **Dashboard** | `dashboard/` | 3000 | UI Next.js, consulta casos, estadísticas |
+| **IoT Simulator** | `iot-simulator/` | — | Telemetría cada 5s (firmada) |
+| **CA Setup** | `ca/` | — | Genera PKI X.509 al iniciar |
+
+---
+
+## ✅ Características Implementadas
+
+### Blockchain (Fase 1)
 
 ### Características Implementadas
 
@@ -196,7 +277,98 @@ npm run test:seguridad
 
 ---
 
-## 🎨 Fase 2: Dashboard (EN PROGRESO)
+### Dashboard (Fase 2)
+
+✅ **Completado 100%:**
+- **RoleSelector** — Cambiar org consultada (5 roles)
+- **CaseDetail** — Visualización donante, receptor, asignación
+- **TelemetryChart** — Gráfico temperatura/humedad en tiempo real
+- **Timeline** — Eventos cronológicos con hash y firmas
+- **IntegrityCheck** — Verificación hash-chain (auto-refresca 10s)
+- **Estadísticas** — Gráficos de tx por tipo, últimas transacciones
+- **Panel /infra** — Monitoreo de nodos, quorum, consistencia
+
+**Rutas:**
+- `/` — Puerta (infra vs consulta)
+- `/infra` — Diagnóstico de nodos
+- `/dashboard` — Inicio con verificación de integridad
+- `/dashboard/casos/[id]` — Detalle de caso (donante + receptor + asignación + telemetría)
+- `/dashboard/estadisticas` — Estadísticas del ledger
+
+---
+
+## 🧪 Testing
+
+### Seguridad (18/18 PASS)
+
+Todos los tests STRIDE implementados y pasando:
+
+```
+✅ Estructura y validación (test1-3)
+✅ Endorsement y PKI (test4-6)
+✅ Consenso y replicación (test7, test16)
+✅ Compatibilidad HLA (test8-9)
+✅ Telemetría y auditoría (test10, test17)
+✅ Control de acceso y protección (test11-12)
+✅ Concurrencia y edge cases (test13, test18)
+✅ Proyección y timeline (test14-15)
+```
+
+Ejecutar tests:
+```bash
+cd nodes && npm run test:seguridad
+```
+
+### E2E (Scripts de Validación)
+
+- `scripts/setup-demo-pitch-data.sh` — Inyecta caso completo de demostración
+- `tests/e2e-role-switching-validation.sh` — Valida cambio de roles en UI
+- `tests/dashboard/test-dashboard-endpoints.sh` — Valida endpoints de proyección
+
+---
+
+## 🐋 Deployment
+
+### Docker Compose (Recomendado)
+
+Levanta TODO automáticamente:
+```bash
+docker compose up --build
+```
+
+Contenedores:
+- `ca-setup` — Genera PKI (se detiene después de completar)
+- `coordinador-nacional` — Nodo orderer (puerto 3001)
+- `coordinador-provincial` — Nodo (puerto 3002)
+- `hospital-donante` — Nodo (puerto 3003)
+- `hospital-receptor` — Nodo (puerto 3004)
+- `iot-simulator` — Telemetría (sin puerto expuesto)
+- `dashboard` — UI React (puerto 3000)
+
+### Logs en Vivo
+
+```bash
+docker compose logs -f  # todos
+docker compose logs -f coordinador-nacional  # nodo específico
+docker compose logs -f dashboard  # UI
+```
+
+### Reset Estado
+
+```bash
+# Opción 1: Limpiar data, mantener certs
+./scripts/reset.sh --force
+
+# Opción 2: Limpiar TODO (certs se regeneran)
+./scripts/reset.sh --force --with-certs
+
+# Opción 3: Usar docker directamente
+docker compose down -v
+```
+
+---
+
+## 📊 Datos de Prueba
 
 ### Estado Actual (Fase 2a - COMPLETO)
 

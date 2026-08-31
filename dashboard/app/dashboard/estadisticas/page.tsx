@@ -27,10 +27,13 @@ export default function EstadisticasPage() {
         const client = getReadClient(role)
         const health = await client.getNodeHealth()
 
+        const txByType = health.transactionsByType ?? {}
+        const totalTx = Object.values(txByType).reduce((sum, count) => sum + count, 0)
+
         const stats: LedgerStats = {
-          totalBlocks: health.length ?? 0,
-          totalTransactions: health.totalTransactions ?? 0,
-          txByType: health.txByType ?? {},
+          totalBlocks: health.ledgerBlocks ?? 0,
+          totalTransactions: totalTx,
+          txByType,
           recentTx: health.recentTransactions ?? [],
           lastUpdate: new Date().toLocaleTimeString('es-AR'),
           error: null,

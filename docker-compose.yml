@@ -97,3 +97,15 @@ services:
       - ./certs:/certs:ro
     depends_on:
       - hospital-donante
+
+  dashboard:
+    build: ./dashboard
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      - coordinador-nacional
+      - coordinador-provincial
+      - hospital-donante
+      - hospital-receptor

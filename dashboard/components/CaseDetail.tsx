@@ -25,7 +25,7 @@ export function CaseDetail({ caseState, telemetry = [], focus = 'full' }: CaseDe
         <SectionCard
           title="Donante"
           hint="Proyección de transacciones donor-registry"
-          empty={!caseState.donorInfo ? 'Sin registro de donante en este caso' : undefined}
+          empty={!caseState.donorInfo ? 'Aún no hay bloque donor-registry para este ID' : undefined}
         >
           {caseState.donorInfo && (
             <dl className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -52,7 +52,7 @@ export function CaseDetail({ caseState, telemetry = [], focus = 'full' }: CaseDe
         <SectionCard
           title="Receptor"
           hint="Proyección de waiting-list"
-          empty={!caseState.recipientInfo ? 'Sin paciente de lista de espera vinculado' : undefined}
+          empty={!caseState.recipientInfo ? 'Aún no hay bloque waiting-list vinculado' : undefined}
         >
           {caseState.recipientInfo && (
             <dl className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -75,7 +75,7 @@ export function CaseDetail({ caseState, telemetry = [], focus = 'full' }: CaseDe
         <SectionCard
           title="Asignación"
           hint="Proyección de assignment (endorsement ya validado en el nodo)"
-          empty={!caseState.assignmentInfo ? 'Sin asignación en el ledger para este caso' : undefined}
+          empty={!caseState.assignmentInfo ? 'Aún no hay assignment: el traslado no empezó, el IoT no debe escribir' : undefined}
         >
           {caseState.assignmentInfo && (
             <dl className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -98,7 +98,7 @@ export function CaseDetail({ caseState, telemetry = [], focus = 'full' }: CaseDe
         <SectionCard
           title="Custodia"
           hint="Estadísticas derivadas de lecturas custody ya grabadas"
-          empty={!stats ? 'Sin telemetría en el ledger para este caso' : undefined}
+          empty={!stats ? 'Aún no hay custody con organId de este caso (IoT no iniciado o esperando assignment)' : undefined}
         >
           {stats && (
             <div className="space-y-4">

@@ -93,8 +93,8 @@ function buildCaseState(transactions) {
       case 'assignment':
         state.assignmentInfo = {
           donorId: payload.donorId,
-          recipientId: payload.recipientId,
-          organ: payload.organ,
+          recipientId: payload.recipientId || payload.patientId,
+          organ: payload.organ || payload.organType,
           hlaScore: payload.hlaScore,
           assignedAt: timestamp,
           compatibilityTimestamp: payload.compatibilityTimestamp,
@@ -105,9 +105,9 @@ function buildCaseState(transactions) {
       case 'custody':
         state.custodyCheckpoints.push({
           timestamp,
-          sensorType: payload.sensorType,
-          value: payload.value,
-          unit: payload.unit,
+          sensorType: payload.sensorType || 'temperature',
+          value: payload.value ?? payload.temperaturaC,
+          unit: payload.unit || 'celsius',
           deviceId: payload.deviceId,
         });
         state.lastUpdated = timestamp;

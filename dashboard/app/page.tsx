@@ -7,7 +7,8 @@ export default function Home() {
         <p className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">INTEGRAlab</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">Coordinación de trasplantes sobre ledger real</h1>
         <p className="mt-3 text-sm text-zinc-400 max-w-xl">
-          El ledger, la PKI y los nodos son la fuente de verdad. Esta UI no inventa datos ni escribe bloques.
+          El ledger es la fuente de verdad. /infra muestra la red. /dashboard proyecta un caso clínico
+          recién cuando ese ID existe en bloques (no al levantar Docker).
         </p>
 
         <div className="mt-10 grid gap-4 sm:grid-cols-2">
@@ -30,7 +31,7 @@ export default function Home() {
             <p className="text-[11px] uppercase tracking-wide text-teal-300">Consulta</p>
             <h2 className="mt-1 text-lg font-semibold">Dashboard clínico</h2>
             <p className="mt-2 text-sm text-zinc-400">
-              Proyección de lectura de un caso: estado, timeline y telemetría. Solo GET.
+              Un caso por ID: donante, lista, asignación y telemetría si el traslado ya empezó. Solo GET.
             </p>
             <p className="mt-4 font-mono text-xs text-zinc-500">/dashboard</p>
           </Link>

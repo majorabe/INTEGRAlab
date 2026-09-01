@@ -11,14 +11,16 @@ export function HonestyTable() {
       detail: 'No hay /sign ni /tx desde el dashboard. Registrar donantes o asignar órganos se hace contra los nodos (tests, curl), no acá.',
     },
     {
-      level: 'simple',
-      title: 'Una identidad por organización',
-      detail: 'El selector elige el nodo (puerto 3001–3004), no un usuario individual dentro del hospital.',
+      level: 'real',
+      title: 'Telemetría = bloques custody',
+      detail:
+        'El simulador IoT no arranca con los nodos. Escribe recién cuando hay assignment y organId = donorId. Cada lectura es un bloque en los 4 nodos.',
     },
     {
       level: 'simple',
-      title: 'Telemetría del simulador',
-      detail: 'Las lecturas vienen del iot-simulator, no de un sensor físico.',
+      title: 'Selector de organización',
+      detail:
+        'Elige desde qué réplica leés (3001–3004). Los cuatro tienen la misma cadena. No es un usuario interno del hospital ni un filtro de privacidad en el API.',
     },
     {
       level: 'no',

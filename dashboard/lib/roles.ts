@@ -17,7 +17,7 @@ export const ROLE_CONFIGS: Record<RoleType, RoleConfig> = {
   'coordinador-nacional': {
     id: 'coordinador-nacional',
     name: 'Coordinador Nacional',
-    description: 'Lectura del caso completo y timeline',
+    description: 'Réplica orderer (puerto 3001). Misma cadena que los pares.',
     port: 3001,
     color: 'bg-teal-800',
     permissions: ['view-all-cases', 'view-timeline'],
@@ -25,7 +25,7 @@ export const ROLE_CONFIGS: Record<RoleType, RoleConfig> = {
   'coordinador-provincial': {
     id: 'coordinador-provincial',
     name: 'Coordinador Provincial',
-    description: 'Lectura del caso y timeline',
+    description: 'Réplica en puerto 3002. Misma cadena que los pares.',
     port: 3002,
     color: 'bg-cyan-800',
     permissions: ['view-all-cases', 'view-timeline'],
@@ -33,7 +33,7 @@ export const ROLE_CONFIGS: Record<RoleType, RoleConfig> = {
   'hospital-donante': {
     id: 'hospital-donante',
     name: 'Hospital Donante',
-    description: 'Lectura de registro de donante y asignación',
+    description: 'Réplica en puerto 3003. Nodo que ingiere telemetría IoT.',
     port: 3003,
     color: 'bg-emerald-800',
     permissions: ['view-donor', 'view-assignment'],
@@ -41,7 +41,7 @@ export const ROLE_CONFIGS: Record<RoleType, RoleConfig> = {
   'hospital-receptor': {
     id: 'hospital-receptor',
     name: 'Hospital Receptor',
-    description: 'Lectura de asignación, custodia y telemetría',
+    description: 'Réplica en puerto 3004. Misma cadena que los pares.',
     port: 3004,
     color: 'bg-sky-800',
     permissions: ['view-assignment', 'view-telemetry'],
@@ -49,7 +49,7 @@ export const ROLE_CONFIGS: Record<RoleType, RoleConfig> = {
   iot: {
     id: 'iot',
     name: 'Vista IoT',
-    description: 'Solo telemetría del nodo de custodia',
+    description: 'Lee telemetría desde el nodo de custodia (hospital-donante).',
     port: 3003,
     color: 'bg-amber-700',
     permissions: ['view-telemetry'],
@@ -80,8 +80,9 @@ export function getRoleNodeURL(role: RoleType): string {
 export type CaseFocus = 'full' | 'donor' | 'custody' | 'telemetry'
 
 export function caseFocusForRole(role: RoleType): CaseFocus {
+  // Los 4 nodos tienen la misma cadena. El selector elige desde qué réplica
+  // se lee, no un filtro de privacidad en el API. La vista IoT sí se centra
+  // en telemetría (operador del contenedor).
   if (role === 'iot') return 'telemetry'
-  if (role === 'hospital-receptor') return 'custody'
-  if (role === 'hospital-donante') return 'donor'
   return 'full'
 }

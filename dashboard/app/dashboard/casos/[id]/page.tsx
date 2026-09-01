@@ -10,6 +10,7 @@ import { CaseResponse } from '@/lib/types'
 import { CaseDetail } from '@/components/CaseDetail'
 import { Timeline } from '@/components/Timeline'
 import { TelemetryChart } from '@/components/TelemetryChart'
+import { CaseLifecycle } from '@/components/CaseLifecycle'
 
 const RECENT_KEY = 'integra-recent-cases'
 
@@ -38,27 +39,32 @@ export default function CasePage() {
     setError(null)
     setData(null)
 
-    const client = getReadClient(role)
-    client
-      .getCaseState(caseId)
-      .then((res) => {
+    async function load() {
+      const client = getReadClient(role)
+      try {
+        const res = await client.getCaseState(caseId)
         if (cancelled) return
         if (!res.found) {
           setError(res.ok === false ? 'Caso no encontrado' : 'Caso no encontrado en este nodo')
+          setData(null)
           return
         }
+        setError(null)
         setData(res)
         rememberCase(caseId)
-      })
-      .catch((err: Error) => {
-        if (!cancelled) setError(err.message)
-      })
-      .finally(() => {
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : String(err))
+      } finally {
         if (!cancelled) setLoading(false)
-      })
+      }
+    }
+
+    void load()
+    const interval = setInterval(() => void load(), 5000)
 
     return () => {
       cancelled = true
+      clearInterval(interval)
     }
   }, [caseId, role])
 
@@ -86,7 +92,8 @@ export default function CasePage() {
           <p className="text-sm font-medium text-destructive">No se pudo mostrar el caso</p>
           <p className="text-sm text-muted-foreground mt-1 break-words">{error}</p>
           <p className="text-xs text-muted-foreground mt-2">
-            El ledger no se modificó. Si el nodo está caído, revisá{' '}
+            El ledger no se modificó. Este ID no tiene transacciones, o el nodo no responde. Altura 0
+            = todavía no corriste el script de demo. Nodo caído →{' '}
             <Link href="/infra" className="underline">
               /infra
             </Link>
@@ -97,6 +104,7 @@ export default function CasePage() {
 
       {data?.state && (
         <>
+          <CaseLifecycle state={data.state} telemetry={data.telemetry ?? []} />
           {focus !== 'telemetry' && (
             <CaseDetail caseState={data.state} telemetry={data.telemetry ?? []} focus={focus} />
           )}
@@ -104,7 +112,7 @@ export default function CasePage() {
             <TelemetryChart
               data={data.telemetry ?? []}
               title="Telemetría de custodia"
-              description="Lecturas custody ya gravadas en el ledger (iot-simulator → nodo)"
+              description="Lecturas custody del ledger (IoT → hospital-donante). Se actualiza cada 5 s si el simulador está corriendo."
             />
           )}
           {showTimeline && <Timeline events={data.timeline ?? []} />}

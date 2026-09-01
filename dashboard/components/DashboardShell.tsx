@@ -77,7 +77,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
           <div className="flex items-center gap-3">
             <label className="text-xs text-muted-foreground">
-              Leer desde
+              Leer réplica
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value as RoleType)}

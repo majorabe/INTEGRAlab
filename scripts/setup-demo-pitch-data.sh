@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
 # Setup Demo Pitch Data para INTEGRAlab
-# Genera data demo-pitch-* para demostración ante jurado (READ-ONLY después de crear)
 #
-# Uso: bash scripts/setup-demo-pitch-data.sh
+# Escribe los HECHOS CLÍNICOS en el ledger (cada uno = 1 bloque replicado):
+#   1. donor-registry      → donante demo-pitch-donor-001
+#   2. waiting-list        → paciente demo-pitch-patient-001
+#   3. assignment          → vínculo donante↔paciente (inicio de trazabilidad)
+# Después arranca el IoT (profile compose `iot`). El simulador espera el
+# assignment y recién ahí graba bloques custody con organId = donorId.
 #
-# Crea:
-#  - 1 donante (demo-pitch-donor-001)
-#  - 1 paciente (demo-pitch-patient-001)
-#  - 1 asignación
-#  - Telemetría simulada (temperatura en rango)
+# Uso (raíz del repo, nodos ya arriba, IoT NO tiene que estar corriendo):
+#   bash scripts/setup-demo-pitch-data.sh
 
-set -e
+set -euo pipefail
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -18,32 +19,45 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(dirname "$SCRIPT_DIR")"
+
 COORD_URL="http://localhost:3001"
 DONANTE_URL="http://localhost:3003"
-RECEPTOR_URL="http://localhost:3004"
 
 DONOR_ID="demo-pitch-donor-001"
 PATIENT_ID="demo-pitch-patient-001"
 
+require_ok() {
+  local label="$1"
+  local json="$2"
+  local ok
+  ok="$(echo "$json" | jq -r '.ok // empty')"
+  if [[ "$ok" != "true" ]]; then
+    echo -e "${RED}✗ ${label}${NC}"
+    echo "$json" | jq . 2>/dev/null || echo "$json"
+    exit 1
+  fi
+}
+
 echo -e "${BLUE}========================================${NC}"
-echo -e "${BLUE}SETUP: Demo Pitch Data para Jurado${NC}"
+echo -e "${BLUE}SETUP: caso clínico demo-pitch${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 
-# Verificar que nodos están levantados
-echo -e "${YELLOW}[1] Verificando que nodos estén levantados...${NC}"
+echo -e "${YELLOW}[1] Verificando nodos...${NC}"
 if ! curl -s "$COORD_URL/health" > /dev/null 2>&1; then
-  echo -e "${RED}Error: No se puede contactar coordinador-nacional en $COORD_URL${NC}"
-  echo -e "${RED}Levanta los nodos primero: docker compose up${NC}"
+  echo -e "${RED}Error: no se contacta coordinador-nacional en $COORD_URL${NC}"
+  echo -e "${RED}Levanta primero: docker compose up --build -d${NC}"
   exit 1
 fi
 echo -e "${GREEN}✓ Nodos disponibles${NC}"
 echo ""
 
-# 1. Registrar donante
-echo -e "${YELLOW}[2] Registrando donante $DONOR_ID...${NC}"
+# --- 1. Donante (1 bloque) ---
+echo -e "${YELLOW}[2] donor-registry → 1 bloque (firma hospital-donante)${NC}"
 DONOR_PAYLOAD='{
-  "donorId":"'$DONOR_ID'",
+  "donorId":"'"$DONOR_ID"'",
   "bloodType":"O+",
   "hlaProfile":{"A":"A2","B":"B7","DR":"DR5"},
   "organType":"kidney",
@@ -54,25 +68,25 @@ DONOR_SIG=$(curl -s -X POST "$DONANTE_URL/sign" \
   -H "Content-Type: application/json" \
   -d "{\"payload\":$DONOR_PAYLOAD}" | jq -r '.signature // empty')
 
-if [ -z "$DONOR_SIG" ]; then
+if [[ -z "$DONOR_SIG" ]]; then
   echo -e "${RED}✗ Fallo al firmar donante${NC}"
   exit 1
 fi
 
-curl -s -X POST "$DONANTE_URL/tx/donor-registry" \
+DONOR_TX=$(curl -s -X POST "$DONANTE_URL/tx/donor-registry" \
   -H "Content-Type: application/json" \
   -d "{
     \"payload\":$DONOR_PAYLOAD,
     \"signatures\":[{\"actor\":\"hospital-donante\",\"signature\":\"$DONOR_SIG\"}]
-  }" > /dev/null
-
+  }")
+require_ok "donor-registry" "$DONOR_TX"
 echo -e "${GREEN}✓ Donante registrado: $DONOR_ID${NC}"
 sleep 1
 
-# 2. Registrar paciente
-echo -e "${YELLOW}[3] Registrando paciente $PATIENT_ID...${NC}"
+# --- 2. Lista de espera (1 bloque, 2 firmas) ---
+echo -e "${YELLOW}[3] waiting-list → 1 bloque (coordinador-nacional + hospital-donante)${NC}"
 PATIENT_PAYLOAD='{
-  "patientId":"'$PATIENT_ID'",
+  "patientId":"'"$PATIENT_ID"'",
   "bloodType":"O+",
   "hlaProfile":{"A":"A2","B":"B7","DR":"DR4"},
   "urgencyLevel":3
@@ -86,12 +100,12 @@ PATIENT_SIG=$(curl -s -X POST "$DONANTE_URL/sign" \
   -H "Content-Type: application/json" \
   -d "{\"payload\":$PATIENT_PAYLOAD}" | jq -r '.signature // empty')
 
-if [ -z "$COORD_SIG" ] || [ -z "$PATIENT_SIG" ]; then
+if [[ -z "$COORD_SIG" || -z "$PATIENT_SIG" ]]; then
   echo -e "${RED}✗ Fallo al firmar paciente${NC}"
   exit 1
 fi
 
-curl -s -X POST "$COORD_URL/tx/waiting-list" \
+PATIENT_TX=$(curl -s -X POST "$COORD_URL/tx/waiting-list" \
   -H "Content-Type: application/json" \
   -d "{
     \"payload\":$PATIENT_PAYLOAD,
@@ -99,85 +113,96 @@ curl -s -X POST "$COORD_URL/tx/waiting-list" \
       {\"actor\":\"coordinador-nacional\",\"signature\":\"$COORD_SIG\"},
       {\"actor\":\"hospital-donante\",\"signature\":\"$PATIENT_SIG\"}
     ]
-  }" > /dev/null
-
-echo -e "${GREEN}✓ Paciente en lista espera: $PATIENT_ID${NC}"
+  }")
+require_ok "waiting-list" "$PATIENT_TX"
+echo -e "${GREEN}✓ Paciente en lista de espera: $PATIENT_ID${NC}"
 sleep 1
 
-# 3. Crear asignación
-echo -e "${YELLOW}[4] Creando asignación...${NC}"
+# --- 3. Compatibilidad HLA + assignment (1 bloque, 2 firmas) ---
+echo -e "${YELLOW}[4] compatibility/query (no escribe bloques)${NC}"
+COMPAT_RESPONSE=$(curl -s -X POST "$DONANTE_URL/compatibility/query" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"donorProfile\":{\"bloodType\":\"O+\",\"hlaProfile\":{\"A\":\"A2\",\"B\":\"B7\",\"DR\":\"DR5\"}},
+    \"waitingList\":[{\"patientId\":\"$PATIENT_ID\",\"bloodType\":\"O+\",\"hlaProfile\":{\"A\":\"A2\",\"B\":\"B7\",\"DR\":\"DR4\"},\"urgencyLevel\":3}]
+  }")
+
+COMPAT_TS=$(echo "$COMPAT_RESPONSE" | jq -r '.compatibilityTimestamp // empty')
+if [[ -z "$COMPAT_TS" ]]; then
+  echo -e "${RED}✗ Fallo /compatibility/query${NC}"
+  echo "$COMPAT_RESPONSE"
+  exit 1
+fi
+echo -e "${GREEN}✓ compatibilityTimestamp=$COMPAT_TS${NC}"
+echo ""
+
+echo -e "${YELLOW}[5] assignment → 1 bloque (coordinador-nacional + hospital-donante)${NC}"
+echo -e "${YELLOW}    Este bloque ES el inicio de trazabilidad del órgano.${NC}"
 ASSIGNMENT_PAYLOAD='{
-  "assignmentId":"demo-pitch-assign-001",
-  "donorId":"'$DONOR_ID'",
-  "patientId":"'$PATIENT_ID'",
-  "organType":"kidney",
-  "timestamp":"2026-08-31T12:00:00Z",
-  "transportMethod":"direct-to-receptor"
+  "donorId":"'"$DONOR_ID"'",
+  "recipientId":"'"$PATIENT_ID"'",
+  "organ":"kidney",
+  "compatibilityTimestamp":"'"$COMPAT_TS"'"
 }'
 
-ASSIGN_SIG=$(curl -s -X POST "$COORD_URL/sign" \
+COORD_ASSIGN_SIG=$(curl -s -X POST "$COORD_URL/sign" \
   -H "Content-Type: application/json" \
   -d "{\"payload\":$ASSIGNMENT_PAYLOAD}" | jq -r '.signature // empty')
 
-if [ -z "$ASSIGN_SIG" ]; then
+HOSP_ASSIGN_SIG=$(curl -s -X POST "$DONANTE_URL/sign" \
+  -H "Content-Type: application/json" \
+  -d "{\"payload\":$ASSIGNMENT_PAYLOAD}" | jq -r '.signature // empty')
+
+if [[ -z "$COORD_ASSIGN_SIG" || -z "$HOSP_ASSIGN_SIG" ]]; then
   echo -e "${RED}✗ Fallo al firmar asignación${NC}"
   exit 1
 fi
 
-curl -s -X POST "$COORD_URL/tx/assignment" \
+ASSIGN_TX=$(curl -s -X POST "$DONANTE_URL/tx/assignment" \
   -H "Content-Type: application/json" \
   -d "{
     \"payload\":$ASSIGNMENT_PAYLOAD,
-    \"signatures\":[{\"actor\":\"coordinador-nacional\",\"signature\":\"$ASSIGN_SIG\"}]
-  }" > /dev/null
+    \"signatures\":[
+      {\"actor\":\"coordinador-nacional\",\"signature\":\"$COORD_ASSIGN_SIG\"},
+      {\"actor\":\"hospital-donante\",\"signature\":\"$HOSP_ASSIGN_SIG\"}
+    ]
+  }")
+require_ok "assignment" "$ASSIGN_TX"
+echo -e "${GREEN}✓ Asignación creada (órgano en condiciones de transitar)${NC}"
+sleep 2
 
-echo -e "${GREEN}✓ Asignación creada${NC}"
-sleep 1
+# --- 4. Arrancar IoT: a partir de acá, 1 bloque custody cada 5s ---
+echo ""
+echo -e "${YELLOW}[6] Arrancando iot-simulator (profile iot, organId=$DONOR_ID)...${NC}"
+cd "$REPO_ROOT"
+if ORGAN_ID="$DONOR_ID" docker compose --profile iot up -d iot-simulator; then
+  echo -e "${GREEN}✓ IoT arriba. Espera el assignment y luego escribe custody cada 5s.${NC}"
+else
+  echo -e "${RED}✗ No se pudo levantar iot-simulator${NC}"
+  echo "Manual: ORGAN_ID=$DONOR_ID docker compose --profile iot up -d iot-simulator"
+  exit 1
+fi
 
-# 4. Inyectar telemetría demo
-echo -e "${YELLOW}[5] Inyectando telemetría de custodia...${NC}"
-
-for i in {1..5}; do
-  TEMP=$((4 - (i - 1) / 2))
-  TELEM_PAYLOAD='{
-    "deviceId":"sensor-contenedor-001",
-    "timestamp":"2026-08-31T12:0'$i':00.000Z",
-    "nonce":"demo-pitch-'$i'",
-    "sensorType":"temperature",
-    "value":'$TEMP',
-    "unit":"celsius",
-    "organId":"'$DONOR_ID'"
-  }'
-
-  TELEM_SIG=$(curl -s -X POST "$DONANTE_URL/sign" \
-    -H "Content-Type: application/json" \
-    -d "{\"payload\":$TELEM_PAYLOAD}" | jq -r '.signature // empty')
-
-  if [ -n "$TELEM_SIG" ]; then
-    curl -s -X POST "$DONANTE_URL/tx/custody" \
-      -H "Content-Type: application/json" \
-      -d "{
-        \"payload\":$TELEM_PAYLOAD,
-        \"signatures\":[{\"actor\":\"hospital-donante\",\"signature\":\"$TELEM_SIG\"}]
-      }" > /dev/null
-    echo -e "  ✓ Telemetría $i ($TEMP°C)"
-  fi
-
-  sleep 0.5
-done
+HEIGHT=$(curl -s "$COORD_URL/health" | jq -r '.ledgerHeight // .ledgerBlocks // 0')
 
 echo ""
 echo -e "${BLUE}========================================${NC}"
-echo -e "${GREEN}✓ SETUP COMPLETADO${NC}"
+echo -e "${GREEN}✓ CASO CLÍNICO LISTO${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
-echo "Data demo-pitch-* creada en el ledger:"
-echo "  • Donante: $DONOR_ID"
-echo "  • Paciente: $PATIENT_ID"
-echo "  • Asignación: demo-pitch-assign-001"
-echo "  • Telemetría: 5 lecturas (4°C cada una)"
+echo "Hechos en el ledger (replicados en los 4 nodos):"
+echo "  1. donor-registry   $DONOR_ID"
+echo "  2. waiting-list     $PATIENT_ID"
+echo "  3. assignment       $DONOR_ID → $PATIENT_ID"
+echo "  4. custody          en curso (IoT, organId=$DONOR_ID)"
 echo ""
-echo -e "${YELLOW}⚠️  IMPORTANTE: Esta data es READ-ONLY para demo.${NC}"
-echo "No modifiques después de crear. Para limpieza:"
-echo "  ./scripts/reset.sh --force && docker compose up --build"
+echo "Altura actual (orderer): $HEIGHT  — va a subir cada ~5s mientras el IoT corra."
+echo ""
+echo "Dashboard clínico: http://localhost:3000/dashboard"
+echo "Consultar:         $DONOR_ID"
+echo ""
+echo "Infra (misma cadena, sin proyección clínica): http://localhost:3000/infra"
+echo ""
+echo "Para cortar telemetría:  docker compose stop iot-simulator"
+echo "Para empezar de cero:    ./scripts/reset.sh --force && docker compose up --build -d"
 echo ""

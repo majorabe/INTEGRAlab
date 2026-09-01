@@ -50,7 +50,10 @@ export function TelemetryChart({
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-12 text-slate-500">
-            <p>No hay datos de telemetría disponibles para este caso</p>
+            <p>
+              Todavía no hay lecturas custody con organId de este caso. Es normal hasta el assignment y el
+              arranque del IoT. El gráfico no inventa puntos.
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -80,7 +83,10 @@ export function TelemetryChart({
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-12 text-slate-500">
-            <p>No hay datos de telemetría disponibles para este caso</p>
+            <p>
+              Todavía no hay lecturas custody con organId de este caso. Es normal hasta el assignment y el
+              arranque del IoT. El gráfico no inventa puntos.
+            </p>
           </div>
         </CardContent>
       </Card>

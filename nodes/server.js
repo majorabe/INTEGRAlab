@@ -20,6 +20,7 @@ const axios = require("axios");
 const { signPayload, verifySignature } = require("./lib/crypto-utils");
 const ledger = require("./lib/ledger");
 const { checkEndorsement } = require("./lib/endorsement");
+const { assertCustodyBusinessRules } = require("./lib/custody-rules");
 const { queryCompatible } = require("./lib/hla-matching");
 const { queryCase, getHealthSummary } = require("./lib/dashboard-projection");
 
@@ -247,6 +248,14 @@ async function submitTransaction(txType, payload, signatures) {
     return { status: 403, body: { ok: false, reason: endorsement.reason } };
   }
 
+  // PASO COMÚN 2b: Custodia = trazabilidad de un órgano ya asignado
+  if (txType === "custody") {
+    const custodyRule = assertCustodyBusinessRules(payload, ledger.readLedger());
+    if (!custodyRule.ok) {
+      return { status: custodyRule.status, body: { ok: false, reason: custodyRule.reason } };
+    }
+  }
+
   // BIFURCACIÓN: IS_ORDERER
   if (IS_ORDERER) {
     // ===== ORDERER LOGIC (coordinador-nacional) =====
@@ -448,6 +457,13 @@ app.post("/internal/order-and-replicate", async (req, res) => {
       ok: false,
       reason: `Política de endorsement no cumplida en order-and-replicate: ${endorsement.reason}`
     });
+  }
+
+  if (block.txType === "custody") {
+    const custodyRule = assertCustodyBusinessRules(block.payload, ledger.readLedger());
+    if (!custodyRule.ok) {
+      return res.status(custodyRule.status).json({ ok: false, reason: custodyRule.reason });
+    }
   }
 
   // CRÍTICO: El ORDERER construye su propio bloque con índice único (no usa el del non-orderer)

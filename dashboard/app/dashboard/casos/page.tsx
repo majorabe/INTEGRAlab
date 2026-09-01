@@ -38,8 +38,8 @@ export default function CasosLookupPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Consultar caso</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          No hay un GET de listado: el nodo solo proyecta un caso por ID. Pegá el identificador que
-          ya está en el ledger.
+          No hay listado de pacientes. El nodo proyecta un caso por ID (donorId o patientId) que ya
+          exista en bloques. Tras el script de demo: demo-pitch-donor-001.
         </p>
       </div>
 

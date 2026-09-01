@@ -35,19 +35,17 @@ cd INTEGRAlab
 # Limpiar estado previo
 ./scripts/reset.sh --force
 
-# Levantar TODO (backend + dashboard containerizado)
-docker compose up --build
+# Levantar red (nodos + dashboard; el IoT NO arranca acá)
+docker compose up --build -d
 
-# Esperar hasta ver:
-# ✅ ca-setup completed successfully
-# ✅ coordinador-nacional started
-# ✅ coordinador-provincial started  
-# ✅ hospital-donante started
-# ✅ hospital-receptor started
-# ✅ iot-simulator started
-# ✅ dashboard started
+# Esperar:
+# ✅ ca-setup completed
+# ✅ 4 nodos Running
+# ✅ dashboard Running
+# (iot-simulator solo con --profile iot, después del assignment)
 
-# Abre navegador en http://localhost:3000
+# Recorrido de prueba: PASOS_DETALLADOS.md
+# http://localhost:3000
 ```
 
 **Tiempo estimado:** 2-3 minutos (primera vez)

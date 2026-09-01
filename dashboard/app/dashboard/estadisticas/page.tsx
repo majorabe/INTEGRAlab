@@ -116,6 +116,10 @@ export default function EstadisticasPage() {
           Actualizado {stats.lastUpdate}
         </div>
       </div>
+      <p className="text-sm text-muted-foreground max-w-2xl">
+        Conteo de bloques de este nodo (todas las tx). No es una lista de pacientes. Con IoT apagado
+        y sin script, todo en 0. En tránsito, custody sube cada ~5 s.
+      </p>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="rounded-lg border bg-card p-4">

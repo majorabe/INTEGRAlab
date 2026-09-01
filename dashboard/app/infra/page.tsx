@@ -207,6 +207,8 @@ export default function InfraPage() {
   const [testsRunning, setTestsRunning] = useState(false)
   const [suite, setSuite] = useState<SuiteResult | null>(null)
   const [suiteError, setSuiteError] = useState<string | null>(null)
+  const [suiteAvailable, setSuiteAvailable] = useState<boolean | null>(null)
+  const [suiteHint, setSuiteHint] = useState<string | null>(null)
   const [copiedHash, setCopiedHash] = useState<string | null>(null)
   const snapshotsRef = useRef(snapshots)
   const testsRunningRef = useRef(false)
@@ -229,6 +231,31 @@ export default function InfraPage() {
   useEffect(() => {
     void refresh()
   }, [refresh])
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/run-tests', { cache: 'no-store' })
+      .then((res) => res.json())
+      .then((body: { available?: boolean; error?: string; hint?: string }) => {
+        if (cancelled) return
+        setSuiteAvailable(body.available === true)
+        setSuiteHint(
+          body.available
+            ? body.hint ?? null
+            : body.error ??
+              'La suite no corre dentro del contenedor dashboard. En el host: npm run test:seguridad'
+        )
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSuiteAvailable(false)
+          setSuiteHint('No se pudo consultar /api/run-tests.')
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     if (testsRunning) return
@@ -544,14 +571,15 @@ export default function InfraPage() {
             <div>
               <h2 className="text-base font-semibold">Suite de tests</h2>
               <p className="text-xs text-zinc-400">
-                Ejecuta <code className="font-mono">node tests/run-tests.js</code> (test01–test19) en el servidor.
-                El auto-refresh se pausa mientras corre.
+                En el host: <code className="font-mono">npm run test:seguridad</code> (test01–test19).
+                Un ledger vacío es normal: los tests escriben sus propias transacciones. Algunos bajan
+                nodos; el auto-refresh de este panel se pausa si la suite corre acá.
               </p>
             </div>
             <button
               type="button"
               onClick={() => void runTests()}
-              disabled={testsRunning}
+              disabled={testsRunning || suiteAvailable === false}
               className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {testsRunning && (
@@ -568,6 +596,16 @@ export default function InfraPage() {
             <p className="text-sm text-zinc-300" aria-live="polite">
               Ejecutando la suite… esto puede tardar un par de minutos (incluye waitForStack y tests que bajan nodos).
             </p>
+          )}
+
+          {suiteHint && suiteAvailable === false && (
+            <p className="text-sm text-amber-100 bg-amber-950/50 border border-amber-500/40 rounded p-3">
+              {suiteHint}
+            </p>
+          )}
+
+          {suiteHint && suiteAvailable === true && (
+            <p className="text-sm text-zinc-300 bg-zinc-950/60 border border-zinc-700 rounded p-3">{suiteHint}</p>
           )}
 
           {suiteError && (

@@ -49,7 +49,7 @@ echo -e "${BLUE}========================================${NC}"
 echo ""
 echo -e "${YELLOW}This script will perform the following actions:${NC}"
 echo ""
-echo "  1. Stop all Docker Compose services (docker compose down)"
+echo "  1. Stop all Docker Compose services including IoT (docker compose --profile iot down)"
 echo "  2. Clear ledger data in ./data/ (keep directory structure)"
 if [[ "$WITH_CERTS" == false ]]; then
   echo "  3. Keep ./certs/ (certificates will NOT be regenerated)"
@@ -74,12 +74,23 @@ echo -e "${BLUE}Starting reset process...${NC}"
 echo ""
 
 # Step 1: Docker Compose Down
-echo -e "${GREEN}[1/3] Stopping Docker Compose services...${NC}"
-if docker compose down 2>&1; then
-  echo -e "${GREEN}✓ Services stopped${NC}"
+# iot-simulator usa profiles: ["iot"]. Un `down` sin ese profile NO lo para:
+# el contenedor sigue y vuelve a escribir custody sobre ./data/.
+echo -e "${GREEN}[1/3] Stopping Docker Compose services (nodos + dashboard + IoT)...${NC}"
+if COMPOSE_PROFILES=iot docker compose down --remove-orphans 2>&1; then
+  echo -e "${GREEN}✓ Compose services stopped${NC}"
 else
-  echo -e "${RED}✗ Failed to stop services${NC}"
+  echo -e "${RED}✗ Failed to stop Compose services${NC}"
   exit 1
+fi
+
+# Contenedores de un up anterior / otro nombre de proyecto
+leftovers="$(docker ps -aq --filter "name=integralab" 2>/dev/null || true)"
+if [[ -n "${leftovers}" ]]; then
+  echo -e "${YELLOW}⚠ Removing leftover INTEGRAlab containers...${NC}"
+  # shellcheck disable=SC2086
+  docker rm -f ${leftovers} 2>&1 && echo -e "${GREEN}✓ Leftover containers removed${NC}" || \
+    echo -e "${YELLOW}⚠ Could not remove some leftover containers${NC}"
 fi
 
 echo ""
@@ -139,5 +150,6 @@ else
 fi
 echo ""
 echo -e "${YELLOW}Next step:${NC}"
-echo -e "${GREEN}  docker compose up --build${NC}"
+echo -e "${GREEN}  docker compose up --build -d${NC}"
+echo -e "${YELLOW}  (el IoT no arranca solo; después: bash scripts/setup-demo-pitch-data.sh)${NC}"
 echo ""

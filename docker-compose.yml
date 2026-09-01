@@ -84,8 +84,12 @@ services:
       ca-setup:
         condition: service_completed_successfully
 
+  # No arranca con `docker compose up`. La telemetría es trazabilidad del
+  # órgano: solo después de un assignment. Activar:
+  #   ORGAN_ID=demo-pitch-donor-001 docker compose --profile iot up -d iot-simulator
   iot-simulator:
     build: ./iot-simulator
+    profiles: ["iot"]
     environment:
       - DEVICE_ID=sensor-contenedor-001
       - CERTS_DIR=/certs
@@ -93,6 +97,7 @@ services:
       - INTERVALO_MS=5000
       - ORGANO=rinon
       - SIMULAR_FALLA_TEMP=true
+      - ORGAN_ID=${ORGAN_ID:-demo-pitch-donor-001}
     volumes:
       - ./certs:/certs:ro
     depends_on:

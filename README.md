@@ -10,22 +10,6 @@ Prototipo completo que implementa un ledger blockchain personalizado para coordi
 
 📺 **Mira la presentación completa:** [https://video-wciso-integra.vercel.app/](https://video-wciso-integra.vercel.app/)
 
----
-
-## 📊 Estado General del Proyecto
-
-**✅ Completitud: 100%**
-
-```
-Fase 1: Backend Blockchain + Endpoints de Lectura     ✅ COMPLETO (18/18 tests)
-Fase 2: Dashboard Frontend                             ✅ COMPLETO (100% funcional)
-Fase 3: Validación End-to-End                         ✅ COMPLETO
-Containerización + Documentación                       ✅ COMPLETO
-```
-
-**Verificado:** El sistema levanta de cero sin pasos manuales no documentados. Listo para demostración.
-
----
 
 ## 🏗️ Arquitectura General
 
@@ -58,14 +42,14 @@ Containerización + Documentación                       ✅ COMPLETO
 
 ### Componentes Principales
 
-| Componente | Ubicación | Descripción |
-|------------|-----------|-------------|
-| **Backend Blockchain** | `nodes/` | Ledger distribuido, endorsement, proyección |
-| **Dashboard Frontend** | `dashboard/` | UI React para visualización e interacción |
-| **Simulador IoT** | `iot-simulator/` | Generador de telemetría realista |
-| **Certificados PKI** | `ca/` | Autoridad de certificación (X.509) |
-| **Tests de Seguridad** | `tests/` | 18 tests STRIDE (18/18 pasando) |
-| **Documentación** | `docs/` | DECISIONES_DE_ALCANCE.md, specs |
+| Componente             | Ubicación        | Descripción                                 |
+|------------------------|------------------|---------------------------------------------|
+| **Backend Blockchain** | `nodes/`         | Ledger distribuido, endorsement, proyección |
+| **Dashboard Frontend** | `dashboard/`     | UI React para visualización e interacción   |
+| **Simulador IoT**      | `iot-simulator/` | Generador de telemetría realista            |
+| **Certificados PKI**   | `ca/`            | Autoridad de certificación (X.509)          |
+| **Tests de Seguridad** | `tests/`         | 18 tests STRIDE (18/18 pasando)             |
+| **Documentación**      | `docs/`          | DECISIONES_DE_ALCANCE.md, specs             |
 
 ---
 
@@ -74,18 +58,21 @@ Containerización + Documentación                       ✅ COMPLETO
 ### Opción 1: Docker Compose (Recomendado)
 
 ```bash
-# 1. Limpiar estado anterior (primera vez)
-./scripts/reset.sh --force --with-certs
+# 1. Limpiar estado anterior
+./scripts/reset.sh --force
 
-# 2. Levantar TODO (Backend + Dashboard + IoT)
-docker compose up --build
+# 2. Red (4 nodos + dashboard). El IoT NO arranca acá.
+docker compose up --build -d
 
-# 3. En nueva terminal: inyectar datos de prueba
+# 3. Comprobar ledger vacío
+curl -s http://localhost:3001/health | jq '{org,status,ledgerHeight}'
+
+# 4. Hechos clínicos + inicio de trazabilidad (arranca el IoT)
 bash scripts/setup-demo-pitch-data.sh
 
-# 4. Abrir dashboard
-http://localhost:3000/dashboard
-# Buscar: demo-pitch-donor-001
+# 5. Dashboard
+# http://localhost:3000/dashboard  →  demo-pitch-donor-001
+# http://localhost:3000/infra      →  altura de la cadena
 ```
 
 ### Opción 2: Manual (Terminales separadas)
@@ -99,8 +86,8 @@ npm run start:coordinador-provincial
 npm run start:hospital-donante
 npm run start:hospital-receptor
 
-# Terminal 5: IoT Simulator
-cd iot-simulator && npm start
+# Terminal 5: IoT Simulator (solo DESPUÉS de un assignment, con ORGAN_ID = donorId)
+cd iot-simulator && ORGAN_ID=demo-pitch-donor-001 npm start
 
 # Terminal 6: Dashboard
 cd dashboard && npm install && npm run dev
@@ -115,7 +102,7 @@ cd dashboard && npm install && npm run dev
 
 | Documento | Contenido | Audiencia |
 |-----------|-----------|-----------|
-| **[PASO_A_PASO_DETALLADO.md](./PASO_A_PASO_DETALLADO.md)** | Explicación arquitectura con ejemplos visuales (600+ líneas) | **Comienza aquí** |
+| **[PASOS_DETALLADOS.md](./PASOS_DETALLADOS.md)** | Recorrido de prueba: contenedores, cuándo hay bloques, dashboard | **Comienza aquí** |
 | **[GUIA_TEST_COMPLETO.md](./GUIA_TEST_COMPLETO.md)** | Testing step-by-step, valores óptimos, troubleshooting | Desarrolladores |
 | **[RESUMEN31-8.md](./RESUMEN31-8.md)** | Diagnóstico completo: estado, completitud, checklist | Project managers |
 
@@ -204,7 +191,7 @@ docker compose up --build
 |-----------|-----------|--------|----------|
 | **Blockchain Nodes** | `nodes/` | 3001-3004 | Ledger, validación, PKI, endorsement |
 | **Dashboard** | `dashboard/` | 3000 | UI Next.js, consulta casos, estadísticas |
-| **IoT Simulator** | `iot-simulator/` | — | Telemetría cada 5s (firmada) |
+| **IoT Simulator** | `iot-simulator/` | — | Profile `iot`. Custody cada 5s **después** del assignment |
 | **CA Setup** | `ca/` | — | Genera PKI X.509 al iniciar |
 
 ---
@@ -331,19 +318,20 @@ cd nodes && npm run test:seguridad
 
 ### Docker Compose (Recomendado)
 
-Levanta TODO automáticamente:
+Levanta la red (nodos + dashboard). El IoT es un paso aparte:
 ```bash
-docker compose up --build
+docker compose up --build -d
 ```
 
-Contenedores:
+Contenedores por defecto:
 - `ca-setup` — Genera PKI (se detiene después de completar)
 - `coordinador-nacional` — Nodo orderer (puerto 3001)
 - `coordinador-provincial` — Nodo (puerto 3002)
 - `hospital-donante` — Nodo (puerto 3003)
 - `hospital-receptor` — Nodo (puerto 3004)
-- `iot-simulator` — Telemetría (sin puerto expuesto)
-- `dashboard` — UI React (puerto 3000)
+- `dashboard` — UI (puerto 3000)
+
+IoT (después del assignment): `ORGAN_ID=<donorId> docker compose --profile iot up -d iot-simulator`
 
 ### Logs en Vivo
 

@@ -126,75 +126,17 @@ Para evitar conflictos entre data de pruebas (18 tests de seguridad, Fase 1), da
 
 ## 9. Vinculación de telemetría a casos (organId)
 
-La capa de proyección (`dashboard-projection.js`) vincula transacciones de custody (telemetría IoT) a un caso donor mediante el campo `payload.organId`.
+La proyección (`dashboard-projection.js`) une custody a un caso si `payload.organId === caseId` (el donorId).
 
-**Regla:** Cuando se envía telemetría, el payload DEBE incluir `organId: <donorId>` para que la transacción sea asociable a un caso en `/dashboard/casos/:id/telemetria`.
+**Regla de nodo (no solo de UI):** `/tx/custody` y `/custody/ingest` exigen `organId` y un `assignment` previo de ese `donorId`. Sin eso: 400/409, sin bloque.
 
-Ejemplo payload de custody (desde `test-dashboard-endpoints.sh`):
-```json
-{
-  "deviceId": "sensor-contenedor-001",
-  "timestamp": "2026-08-27T13:40:00.000Z",
-  "nonce": "2026-08-27T13:40:00.000Z",
-  "sensorType": "temperature",
-  "value": 2.5,
-  "unit": "celsius",
-  "organId": "demo-dev-donor-001"
-}
-```
+El simulador incluye `organId` (env `ORGAN_ID`) y espera el assignment antes de transmitir.
 
-Esto **no requiere cambios en infraestructura** (iot-simulator, endorsement, etc.) — es solo una convención en cómo se arman los payloads. La lógica de `extractCaseTransactions()` ya valida esta vinculación (ver `nodes/lib/dashboard-projection.js` línea 45).
+## 10. Telemetría: no es ruido de red
 
-## 10. Telemetría en Dashboard: Stream del simulador vs. inyección manual para demo
+`iot-simulator` **no** forma parte de `docker compose up`. Usa el profile `iot` y se levanta al final de `scripts/setup-demo-pitch-data.sh` (o a mano: `ORGAN_ID=<donorId> docker compose --profile iot up -d iot-simulator`).
 
-El `iot-simulator` en docker-compose (`iot-simulator/simulate.js`) genera bloques de custody continuamente con el siguiente schema:
+El payload lleva el schema real (`temperaturaC`, `humedadPct`, `gps`, `fueraDeRango`) **más** `organId`. No hay stream “huérfano” de fondo: o el órgano está asignado y hay custody vinculada, o no hay telemetría.
 
-```json
-{
-  "deviceId": "sensor-contenedor-001",
-  "organo": "rinon",
-  "secuencia": 1,
-  "timestamp": "2026-08-27T13:40:00.000Z",
-  "temperaturaC": 2.5,
-  "humedadPct": 45.3,
-  "gps": { "lat": -32.9468, "lon": -60.6393 },
-  "fueraDeRango": false
-}
-```
+`extractTelemetrySeries()` sigue identificando lecturas por `temperaturaC`.
 
-Estos bloques generados continuamente **NO incluyen el campo `organId`** necesario para vincular telemetría a casos en `/dashboard/casos/:id/telemetria` (ver §9).
-
-**Decisión para Fase 2:**
-
-Para la demo de pitch, telemetría se inyecta **manualmente via API** usando dev-fixtures (`dashboard/lib/dev-fixtures.ts`) con payloads que usan el mismo schema real del iot-simulator PERO agregando el campo `organId: demo-pitch-donor-001`:
-
-```json
-{
-  "deviceId": "sensor-contenedor-001",
-  "organo": "rinon",
-  "secuencia": 1,
-  "timestamp": "2026-08-27T13:40:00.000Z",
-  "temperaturaC": 2.5,
-  "humedadPct": 45.3,
-  "gps": { "lat": -32.9468, "lon": -60.6393 },
-  "fueraDeRango": false,
-  "organId": "demo-pitch-donor-001"
-}
-```
-
-El stream continuo del iot-simulator (con 2,830+ bloques ya en el ledger) **continúa sin vinculación de caso** — son parte del "background" del ledger pero no se muestran en las vistas de caso específico del dashboard.
-
-**Por qué:**
-- Mantiene integridad de los ~2,830 bloques de custody existentes (generados sin `organId`)
-- No toca infraestructura de blockchain (iot-simulator sigue igual)
-- Permite demo limpia y auditable: data que mostramos en dashboard (demo-pitch-*) ≠ data de background (sin organId)
-- Honesto: no fingimos vinculación que no existe en datos reales acumulados
-- Simplificación del prototipo: agregamos un campo, no restructuramos todo
-
-**En la capa de proyección:**
-- `extractTelemetrySeries()` busca `payload.temperaturaC !== undefined` para identificar payloads de telemetría
-- Solo retorna readings que pueden ser vinculados (tienen `organId`)
-- Dashboard muestra: temperatura, humedad, GPS, alert flag (fueraDeRango)
-
-**Para producción (post-demo):**
-Si se desea que IoT real (iot-simulator) genere automáticamente `organId`, se modificaría `iot-simulator/simulate.js` para emitir ese campo — es una mejora post-pitch, no requisito de Fase 2.

@@ -1,39 +1,55 @@
 # Dependencias
 node_modules/
 
-# Variables de entorno
+# Secretos y runtime (se regeneran)
 .env
 .env.*
-
-# PKI — certificados y claves privadas, regenerables via ca-setup (docker compose)
+!.env.example
 certs/
-
-# Estado del ledger — runtime, regenerable con scripts/reset.sh
 data/
 
 # Logs
 *.log
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
 
-# Sistema operativo / editor
+# OS / editor
 .DS_Store
 Thumbs.db
+Desktop.ini
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
+*.code-workspace
+*Zone.Identifier*
 
-# Overrides locales de Docker
+# Docker local
 docker-compose.override.yml
 
-# Next.js — dashboard/
+# Next.js (dashboard)
 .next/
 out/
 next-env.d.ts
 *.tsbuildinfo
 
-# Env locales del dashboard (si usás variables tipo AI_API_URL, base URLs de nodos, etc.)
-.env.local
-.env*.local
+# Tests / cobertura
+coverage/
+.nyc_output/
 
+# Temporales
+tmp/
+temp/
+*.bak
+*.orig
+*.tmp
 
-# Varios 
-*Zone.Identifier*
+# Claves sueltas fuera de certs/
+*.pem
+*.key
+
+# Cursor / local
+.cursor/

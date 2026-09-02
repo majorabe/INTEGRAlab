@@ -28,98 +28,63 @@ Cuando un nodo valida y acepta una transacción, la propaga a los demás nodos p
 
 **Por qué:** esto reproduce la propiedad de seguridad más importante de un sistema distribuido para este dominio — que ningún nodo puede imponer unilateralmente una versión falsa del ledger a los demás — sin implementar un protocolo de consenso Raft/BFT completo, que excede el alcance de un prototipo de concurso.
 
-## 5. Sin interfaz gráfica
+## 5. UI de consulta, no de escritura
 
-El prototipo se opera y demuestra vía API REST (curl / scripts / colección de pruebas), no con una UI. Es una decisión de tiempo, no de arquitectura — la capa de presentación no es donde está el valor técnico que este proyecto necesita demostrar.
+Hay un dashboard Next.js (`/dashboard` clínico y `/infra` de red). **No escribe el ledger.** La demo clínica se carga con `scripts/setup-demo-pitch-data.sh`; los ataques con `scripts/setup-demo-attack-scenarios.sh`. Curl y la suite de tests siguen siendo la forma de ejercer escritura y defensa.
 
-## 6. Dashboard de solo lectura: Capa de proyección del ledger (Fase 1)
+**Por qué:** el valor del prototipo está en el ledger, la PKI y el endorsement. La UI es una proyección. Inventar o mutar datos desde React repetiría el error de un MVP simulado.
 
-El prototipo implementa una capa de lectura (_projection layer_) que **no modifica ni reemplaza el ledger authoritative**, sino que lo transforma en formatos consumibles por una interfaz de usuario.
+## 6. Dashboard de solo lectura: capa de proyección del ledger
+
+El prototipo implementa una capa de lectura (_projection layer_) que **no modifica ni reemplaza el ledger authoritative**, sino que lo transforma en formatos consumibles por la interfaz.
 
 **Arquitectura:**
 
 El ledger sigue siendo la única fuente de verdad (append-only, inmutable, hash-encadenado). La proyección es una serie de endpoints GET que:
-1. Leen el ledger completo via `ledger.readLedger()`
-2. Transforman los datos según el caso consultado (donorId o patientId)
-3. Retornan vistas consolidadas: estado del caso, timeline de eventos, series de telemetría, salud del nodo
+1. Leen el ledger vía `ledger.readLedger()`
+2. Transforman los datos según el caso (donorId o patientId)
+3. Retornan vistas: estado del caso, timeline, telemetría, overview clínico
 
-**Endpoints implementados (`nodes/lib/dashboard-projection.js` + `nodes/server.js` líneas 233–359):**
+**Endpoints (`nodes/lib/dashboard-projection.js`):**
 
-- `GET /dashboard/casos/:id` → estado consolidado (donorInfo, recipientInfo, assignmentInfo, custodyCheckpoints)
-- `GET /dashboard/casos/:id/timeline` → lista ordenada de eventos con timestamp/actor/hash/payload resumido
-- `GET /dashboard/casos/:id/telemetria` → serie temporal de lecturas de sensores (temperatura, humedad, etc.)
-- `GET /dashboard/health` → salud del nodo: conteo de bloques, transacciones por tipo, últimas 5 transacciones
+- `GET /dashboard/overview` → tablero (conteos, donantes, lista, asignaciones)
+- `GET /dashboard/casos/:id` → estado consolidado
+- `GET /dashboard/casos/:id/timeline` → eventos ordenados
+- `GET /dashboard/casos/:id/telemetria` → lecturas del contenedor
+- `GET /dashboard/health` → salud del nodo
 
-**Control de acceso:**
+**Control de acceso:** los endpoints de caso y overview requieren header `x-actor` (self, auditor, coordinador-nacional o coordinador-provincial). `/dashboard/health` es público.
 
-- Endpoints de caso (`/dashboard/casos/:id/*`): requieren header `x-actor` que sea self, auditor, coordinador-nacional o coordinador-provincial
-- `/dashboard/health`: sin control de acceso (es un health check público)
+**Por qué:** ningún cambio en la UI afecta la validez del ledger. En producción (Fabric) esto equivaldría a un indexador externo o a queries de world state, no a invoke.
 
-**Por qué:**
+**No duplica datos:** transformación en tiempo de lectura. No hay caché persistente ni base secundaria.
 
-Esta es una decisión arquitectónica para Fase 1 (prototipo pre-jurado). En Fase 2 (UI real), una interfaz web consumirá estos endpoints. Al separar la capa de proyección del ledger authoritativo, garantizamos que:
-1. **Integridad:** Ningún cambio en la UI afecta la seguridad o validez del ledger
-2. **Auditabilidad:** El ledger permanece inmutable y verificable independientemente de cómo se presente
-3. **Escalabilidad:** Futuros componentes (caché, índices, replicación de vistas) se agregan sin tocar endorsement ni validación
+## 7. Frontend: lectura fija, dos paneles
 
-En producción (Hyperledger Fabric real), esta capa equivaldría a un indexador externo (ej. ElasticSearch) o un gateway que hace queries a `world state` via chaincode query, no invoke.
+El frontend en `dashboard/` **no llama** `/sign`, `/tx`, `/ledger` ni `/internal/*`.
 
-**No duplica datos:** La proyección es transformación pura sobre el ledger en tiempo de lectura. No hay caché persistente ni base de datos secundaria.
-
-## 7. Dashboard Frontend (Fase 2) — UI de solo consulta
-
-El frontend en `dashboard/` **no escribe el ledger**. Consume únicamente GET de la proyección de Fase 1 (`/dashboard/casos/:id`, `/timeline`, `/telemetria`, `/dashboard/health`). No llama `/sign`, `/tx`, `/ledger` ni `/internal/*`.
-
-El selector de rol elige **desde qué nodo se lee** (puertos 3001–3004), no un login de usuario ni una identidad extra.
-
-**Roles de UI (organizaciones reales):**
-
-- Coordinador Nacional (3001)
-- Coordinador Provincial (3002)
-- Hospital Donante (3003)
-- Hospital Receptor (3004)
-- Vista IoT: solo telemetría, leyendo el nodo de custodia (hospital-donante). No es una org nueva.
-
-**Auditor no es un rol de UI.** No hay certificado de auditor en la PKI. El valor `x-actor: auditor` puede aparecer en tests del nodo; no se ofrece en el selector.
+La consulta clínica lee siempre el coordinador nacional (`x-actor: coordinador-nacional`). No hay selector de organización en el header: las cuatro réplicas deben coincidir; cambiar de nodo no cambia el caso clínico.
 
 **Rutas:**
 
 - `/` — puerta (infra vs consulta)
-- `/infra` — diagnóstico de nodos (fuera del dashboard clínico)
-- `/dashboard` — consulta clínica de solo lectura
+- `/infra` — salud de los 4 nodos, integridad, verificación A1–A9 (independiente del tablero clínico)
+- `/dashboard` — consulta de solo lectura
+- `/dashboard/casos` — listado
+- `/dashboard/casos/:id` — ficha + telemetría
+- `/dashboard/estadisticas` — resumen clínico
 
-**Por qué no hay escrituras en el front:** el valor del prototipo está en el ledger, la PKI y el endorsement. La UI es una proyección. Inventar o mutar datos desde React repetiría el error del INTEGRA-MVP simulado.
+El cliente no maneja claves privadas. Ver `dashboard/lib/read-client.ts`.
 
-**Seguridad en el cliente:**
-
-- El cliente no maneja claves privadas
-- Header `x-actor` = organización del nodo que se consulta (la vista IoT usa `hospital-donante` porque `iot` no está en el access control de los endpoints)
-- No hay sesiones de usuario
-
-Ver `dashboard/lib/read-client.ts`.
-
-## 8. Convención de nombres para test data (Fase 2 dashboard development)
-
-Para evitar conflictos entre data de pruebas (18 tests de seguridad, Fase 1), data de auditoría, y data de desarrollo del dashboard (Fase 2), se establece una convención de prefijos:
+## 8. Convención de nombres en el ledger
 
 | Prefijo | Uso | Ejemplo |
 |---------|-----|---------|
 | `test{NN}-{rol}-*` | Suite 01–20 (`rol` = donor, patient, organ) | `test05-donor-a3f2`, `test17-donor-3-b1c0` |
-| `test-dash-{rol}-*` | Endpoints del dashboard | `test-dash-donor-9e2d` |
-| **`demo-dev-*`** | **Desarrollo Fase 2 (interactivo)** | **`demo-dev-donor-001`, `demo-dev-patient-001`** |
-| **`demo-donor-*` / `demo-patient-*`** | **Demo clínica (pitch)** | **`demo-donor-001`, `demo-patient-001`** |
+| `test-dash-{rol}-*` | Script de endpoints del dashboard | `test-dash-donor-9e2d` |
+| `demo-donor-*` / `demo-patient-*` | Caso clínico de demo (pitch) | `demo-donor-001`, `demo-patient-001` |
 
-**Reglas:**
-- Cada fase/feature usa su propio prefijo
-- No reutilizar prefijos existentes en nuevos desarrollo
-- `demo-dev-*` es para cualquier iteración de desarrollo interactivo
-- `demo-pitch-*` es **read-only** desde el momento que se crea — no hacer cambios después de que la data está en el ledger
-- Permite reverting a "estado limpio" simplemente filtrando por prefijo en auditorías posteriores
-
-**En la Fase 2 (dashboard):**
-- Usar `demo-dev-donor-001`, `demo-dev-patient-001`, etc. para testeos interactivos
-- La convención permite diferenciar en auditorías: ¿fue data de demo de juro o de desarrollo?
-- Post-demo: los datos con prefijo `demo-pitch-*` quedan como evidencia del flujo de jurado
+**Reglas:** no reutilizar prefijos entre demo y tests. Tras un `reset.sh`, el ledger queda vacío; el script de pitch vuelve a crear `demo-*`.
 
 ## 9. Vinculación de telemetría a casos (organId)
 

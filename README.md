@@ -1,367 +1,199 @@
-# 🏥 INTEGRAlab
+# INTEGRAlab
 
-Infraestructura de Trazabilidad e Identidad para la Gestión de Recursos de Asignación
+Infraestructura de Trazabilidad e Identidad para la Gestión de Recursos de Asignación.
 
-Prototipo completo: ledger blockchain personalizado + PKI X.509 + telemetría en tiempo real + compatibilidad HLA.
-**4 nodos distribuidos, 20+ tests de seguridad, dashboard interactivo.**
+Prototipo: ledger hash-encadenado + PKI X.509 + telemetría IoT + compatibilidad HLA.
+**4 nodos, 20 tests de seguridad, dashboard de consulta clínica y de infraestructura.**
 
----
-
-## 📺 Video de Presentación
-
-**Ver demostración completa:** [https://video-wciso-integra.vercel.app/](https://video-wciso-integra.vercel.app/)
+**Video:** [demostración](https://video-wciso-integra.vercel.app/)
 
 ---
 
-## 🚀 Quick Start (5 minutos)
+## Quick start
 
 ```bash
-# 1. Limpiar
 ./scripts/reset.sh --force
-
-# 2. Levantar red (4 nodos + dashboard)
 docker compose up --build -d
-
-# 3. Verificar que esté listo
 curl -s http://localhost:3001/health | jq '.ledgerHeight'
-
-# 4. Crear caso de demostración + trazabilidad IoT
 bash scripts/setup-demo-pitch-data.sh
-
-# 5. Ver en navegador
-# Dashboard: http://localhost:3000/dashboard
-# Infraestructura: http://localhost:3000/infra
 ```
 
-⚠️ **Para detalles paso a paso:** Ver `[PASOS_DETALLADOS.md](./PASOS_DETALLADOS.md)`
+| Qué | Dónde |
+| --- | --- |
+| Consulta clínica | http://localhost:3000/dashboard |
+| Salud de la red | http://localhost:3000/infra |
+
+Paso a paso: [PASOS_DETALLADOS.md](./PASOS_DETALLADOS.md)
 
 ---
 
-## 📸 Pantallas del Proyecto
+## Recorrido visual
 
-### Dashboard — Visualización de Casos Clínicos
+Consulta clínica (`/dashboard`) y salud de la red (`/infra`). Caso de demo: `demo-donor-001` → `demo-patient-001`.
 
-<div align="center">
-  <img src="./pantallas/panel_dashboard1.jpg" alt="Dashboard Principal" width="700">
-</div>
-
-Panel principal con datos consolidados del donante, receptor y estado de asignación. Muestra en tiempo real el avance del caso clínico.
-
----
-
-
-
-## 📑 Índice de Documentación
-
-
-
-### 🎯 Por Caso de Uso
-
-
-| Quiero...                   | Documento                                          | Tiempo |
-| --------------------------- | -------------------------------------------------- | ------ |
-| Ver cómo funciona           | [PASOS_DETALLADOS.md](./PASOS_DETALLADOS.md)       | 15 min |
-| Probar ataques de seguridad | [PASOS_DE_ATAQUES.md](./PASOS_DE_ATAQUES.md)       | 10 min |
-| Ejecutar script de ataques  | [GUIA_DE_USO_ATAQUES.md](./GUIA_DE_USO_ATAQUES.md) | 5 min  |
-| Entender tests              | [DIAGNOSTICO_TESTS.md](./DIAGNOSTICO_TESTS.md)     | 10 min |
-| Troubleshoot problemas      | [GUIA_TEST_COMPLETO.md](./GUIA_TEST_COMPLETO.md)   | 20 min |
-
-
-
-
-### 📚 Fundamentación del Proyecto
-
-**PDFs académicos** — `docs/fundamentacion/`
-
-
-| Tema                                 | Archivo                                                                                      |
-| ------------------------------------ | -------------------------------------------------------------------------------------------- |
-| Historia de usuario (casos clínicos) | `[INTEGRA_Historia_Usuario.pdf](./docs/fundamentacion/INTEGRA_Historia_Usuario.pdf)`         |
-| Análisis STRIDE (amenazas)           | `[INTEGRA_Paso1_Amenazas.pdf](./docs/fundamentacion/INTEGRA_Paso1_Amenazas.pdf)`             |
-| Diseño arquitectónico                | `[INTEGRA_Paso2_Arquitectura.pdf](./docs/fundamentacion/INTEGRA_Paso2_Arquitectura.pdf)`     |
-| Detalles de implementación           | `[INTEGRA_Paso3_Implementacion.pdf](./docs/fundamentacion/INTEGRA_Paso3_Implementacion.pdf)` |
-| Glosario técnico                     | `[INTEGRA_Glosario.pdf](./docs/fundamentacion/INTEGRA_Glosario.pdf)`                         |
-
-
-
-
-### 🏗️ Decisiones Técnicas
-
-**Documento único:** `[docs/DECISIONES_DE_ALCANCE.md](./docs/DECISIONES_DE_ALCANCE.md)`
-
-Explica 10 decisiones de simplificación prototipo vs. producción (Hyperledger Fabric).
+<table>
+  <tr>
+    <td align="center" valign="top" width="50%">
+      <a href="./pantallas/panel_dashboard1.jpg">
+        <img src="./pantallas/panel_dashboard1.jpg" alt="Tablero clínico" width="380">
+      </a><br>
+      <sub><b>Tablero</b> — donantes, lista de espera y estado del traslado</sub>
+    </td>
+    <td align="center" valign="top" width="50%">
+      <a href="./pantallas/panel_dashboard2.jpg">
+        <img src="./pantallas/panel_dashboard2.jpg" alt="Compatibilidad HLA y contenedor" width="380">
+      </a><br>
+      <sub><b>Compatibilidad</b> — ranking HLA y lecturas del contenedor</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" valign="top" width="50%">
+      <a href="./pantallas/trazabilidad1.jpg">
+        <img src="./pantallas/trazabilidad1.jpg" alt="Ficha del caso" width="380">
+      </a><br>
+      <sub><b>Ficha</b> — donante → lista → asignación → traslado → recepción</sub>
+    </td>
+    <td align="center" valign="top" width="50%">
+      <a href="./pantallas/trazabilidad2.jpg">
+        <img src="./pantallas/trazabilidad2.jpg" alt="Telemetría del contenedor" width="380">
+      </a><br>
+      <sub><b>Telemetría</b> — 80 lecturas, rango 0–4 °C y alerta a mitad de viaje</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" valign="top" width="50%">
+      <a href="./pantallas/panel_infra.jpg">
+        <img src="./pantallas/panel_infra.jpg" alt="Salud de la red" width="380">
+      </a><br>
+      <sub><b>Infraestructura</b> — 4 nodos, quorum, integridad y verificación A1–A9</sub>
+    </td>
+    <td align="center" valign="top" width="50%">
+      <a href="./pantallas/contenedores_docker.jpg">
+        <img src="./pantallas/contenedores_docker.jpg" alt="Contenedores Docker" width="380">
+      </a><br>
+      <sub><b>Docker</b> — 4 nodos + dashboard en marcha; CA e IoT detenidos (profile iot)</sub>
+    </td>
+  </tr>
+</table>
 
 ---
 
+## Documentación
 
+| Quiero… | Documento |
+| --- | --- |
+| Ver cómo funciona | [PASOS_DETALLADOS.md](./PASOS_DETALLADOS.md) |
+| Probar ataques (A1–A9) | [PASOS_DE_ATAQUES.md](./PASOS_DE_ATAQUES.md) |
+| Botón «Ejecutar verificación» | [DIAGNOSTICO_TESTS.md](./DIAGNOSTICO_TESTS.md) |
+| Qué se simplificó vs producción | [docs/DECISIONES_DE_ALCANCE.md](./docs/DECISIONES_DE_ALCANCE.md) |
 
-## 🎮 Simular Ataques de Seguridad
+PDFs en `docs/fundamentacion/`: [historia de usuario](./docs/fundamentacion/INTEGRA_Historia_Usuario.pdf), [STRIDE](./docs/fundamentacion/INTEGRA_Paso1_Amenazas.pdf), [arquitectura](./docs/fundamentacion/INTEGRA_Paso2_Arquitectura.pdf), [implementación](./docs/fundamentacion/INTEGRA_Paso3_Implementacion.pdf), [glosario](./docs/fundamentacion/INTEGRA_Glosario.pdf).
 
-Verifica que el sistema rechace intentos maliciosos:
+---
+
+## Simular ataques
+
+Los escenarios A1–A8 **no escriben bloques**. A9 es tamper manual de `ledger.json` (al final).
 
 ```bash
-# Spoofing: Cert autofirmado
-bash scripts/setup-demo-attack-scenarios.sh a1
-
-# Tampering: Firma modificada
-bash scripts/setup-demo-attack-scenarios.sh a3
-
-# Endorsement incompleto (1 firma, necesita 2)
-bash scripts/setup-demo-attack-scenarios.sh a4
-
-# Todos los ataques (A1-A8, A9 manual)
-bash scripts/setup-demo-attack-scenarios.sh all
+bash scripts/setup-demo-attack-scenarios.sh a1    # cert autofirmado
+bash scripts/setup-demo-attack-scenarios.sh a3    # firma modificada
+bash scripts/setup-demo-attack-scenarios.sh a4    # endorsement incompleto
+bash scripts/setup-demo-attack-scenarios.sh all   # A1–A8
 ```
 
-**Resultado esperado:** ✅ Todos rechazados (altura ledger = 0, no se crearon bloques)
+Esperado: rechazados (altura del ledger = 0 si el ledger estaba vacío). Detalle: [PASOS_DE_ATAQUES.md](./PASOS_DE_ATAQUES.md).
 
-📖 **Ver detalles en:** `[PASOS_DE_ATAQUES.md](./PASOS_DE_ATAQUES.md)`
+No uses **Ejecutar verificación** a mitad de la demo clínica: esa suite **sí escribe** casos de test.
 
 ---
 
+## Tests de seguridad
 
+**En el navegador:** http://localhost:3000/infra → **Ejecutar verificación** (algunos tests se saltan dentro del contenedor del dashboard).
 
-## ✅ Ejecutar Tests de Seguridad
-
-
-
-### Opción 1: Desde navegador (en /infra)
-
-Abre `http://localhost:3000/infra` → Haz clic en **"Ejecutar verificación"**
-
-Resultado: **15+ tests pasan en vivo** (algunos tests hacen skip si Docker no disponible en contenedor)
-
-### Opción 2: Desde terminal (host)
+**En el host:**
 
 ```bash
 npm run test:seguridad
 ```
 
-Resultado: **20/20 tests pasan** (incluye tests que manipulan contenedores)
-
-📖 **Más información:** `[DIAGNOSTICO_TESTS.md](./DIAGNOSTICO_TESTS.md)`
-
-### Panel de Infraestructura — Monitoreo de Nodos
-
-<div align="center">
-  <img src="./pantallas/panel_infra.jpg" alt="Panel de Infraestructura" width="700">
-</div>
-
-Vista de infraestructura con estado de los 4 nodos, quorum actual, consistencia del ledger e integridad de la cadena. Incluye botón para ejecutar verificación de seguridad.
+Esperado: 20/20 (incluye tests que manipulan contenedores). [DIAGNOSTICO_TESTS.md](./DIAGNOSTICO_TESTS.md)
 
 ---
 
-
-
-## 🏛️ Arquitectura
+## Arquitectura
 
 ```
 WEB DASHBOARD (http://localhost:3000)
-    ↓ HTTP GET + PKI header
-BLOCKCHAIN BACKEND (Puertos 3001-3004)
-    • 4 Nodos: Coordinador Nacional + 3 Hospitales
-    • Hash-chain: Cada bloque contiene hash del anterior
-    • PKI X.509: Firma digital en cada transacción
-    • Endorsement: Requiere múltiples firmas
-    • Ledger: JSON append-only en ./data/
-    ↓
-IoT Simulator (Telemetría cada 5s después del assignment)
+    /dashboard  consulta clínica (solo lectura)
+    /infra      salud de la red
+         ↓ HTTP + identidad PKI
+NODOS (3001–3004)
+    Coordinador nacional + provincial + hospital donante + hospital receptor
+    Hash-chain, PKI X.509, endorsement N-of-M, ledger JSON en ./data/
+         ↓
+IoT (profile iot) — lecturas firmadas tras un assignment
 ```
 
+| Componente | Dónde | Qué hace |
+| --- | --- | --- |
+| Backend | `nodes/` | Ledger, validación, PKI, endorsement |
+| Dashboard | `dashboard/` | Consulta clínica + infra |
+| IoT | `iot-simulator/` | Temperatura/humedad del contenedor |
+| CA | `ca/` | Certificados X.509 |
+| Tests | `tests/` | 20 tests STRIDE |
 
-
-### Componentes Principales
-
-
-| Componente             | Ubicación        | Qué Hace                             |
-| ---------------------- | ---------------- | ------------------------------------ |
-| **Backend Blockchain** | `nodes/`         | Ledger, validación, PKI, endorsement |
-| **Dashboard**          | `dashboard/`     | UI Next.js con gráficos y timeline   |
-| **IoT Simulator**      | `iot-simulator/` | Genera telemetría realista           |
-| **PKI CA**             | `ca/`            | Genera certificados X.509            |
-| **Tests**              | `tests/`         | 20 tests STRIDE (seguridad)          |
-
-### Dashboard — Detalle de Asignación y Compatibilidad
-
-<div align="center">
-  <img src="./pantallas/panel_dashboard2.jpg" alt="Dashboard Asignación" width="700">
-</div>
-
-Detalle de la asignación entre donante y receptor, con cálculo de compatibilidad HLA y grupo sanguíneo. Muestra puntuación de matching y validación de endorsement.
+**Transacciones:** `donor-registry` → `waiting-list` → `assignment` → `custody` (telemetría) → `reception`.
 
 ---
 
-
-
-## ⚙️ Configuración
-
-
-
-### Primer Setup
+## Configuración
 
 ```bash
+# Primera vez (regenera certs)
 ./scripts/reset.sh --force --with-certs
-docker compose up --build
-```
+docker compose up --build -d
 
-
-
-### Reset entre sesiones
-
-```bash
-# Opción 1: Limpiar datos, mantener certs
+# Entre sesiones (mantiene certs)
 ./scripts/reset.sh --force
-docker compose up --build
-
-# Opción 2: Limpiar TODO (regenera certs)
-docker compose down -v
+docker compose up --build -d
 ```
 
-
-
-### Certificados (TTL: 72 horas)
-
-Si pasaron 3+ días, regenerar:
+Certificados: TTL 72 h. Si pasaron 3+ días, `--with-certs`.
 
 ```bash
-./scripts/reset.sh --force --with-certs
-docker compose up --build
-```
-
----
-
-
-
-## 🔍 Verificar Estado
-
-```bash
-# Salud de nodos
 curl -s http://localhost:3001/health | jq
-
-# Integridad del ledger
 curl -s http://localhost:3001/verify-integrity | jq
-
-# Contenedores en vivo
 docker compose ps
 ```
 
 ---
 
+## Qué queda cubierto
 
-
-## 📊 Características Implementadas
-
-✅ **Blockchain:**
-
-- Hash-encadenamiento immutable
-- Validación de integridad en cada lectura
-- Replicación entre nodos
-
-✅ **Criptografía:**
-
-- Certificados X.509 por organización
-- Firma digital RSA-2048
-- Validación de identidad (OU del certificado)
-
-✅ **Lógica de Negocio:**
-
-- Endorsement N-of-M (multisig)
-- Validación HLA + compatibilidad de sangre
-- Proyección de lectura consolidada
-
-✅ **Transacciones:**
-
-- `donor-registry` — Registrar donante
-- `waiting-list` — Lista de espera
-- `assignment` — Asignar órgano
-- `custody` — Telemetría IoT con firma
-
-✅ **Seguridad:**
-
-- 20/20 tests STRIDE pasando
-- Protección contra spoofing, tampering, replay
-- Control de acceso por rol
-- Auditoría completa
-
-### Trazabilidad — Timeline de Eventos y Telemetría
-
-<div align="center">
-  <img src="./pantallas/trazabilidad1.jpg" alt="Timeline de Trazabilidad" width="700">
-</div>
-
-Línea temporal cronológica de todos los eventos del caso: registro de donante, lista de espera, asignación y lecturas de temperatura en tiempo real del contenedor IoT.
-
----
-
-
-
-## 📂 Estructura del Repositorio
+- Hash-chain, réplica entre 4 nodos, verificación de integridad
+- X.509 por organización, firma RSA-2048, control de acceso por rol
+- Endorsement N-of-M, matching de sangre + HLA, ranking de candidatos
+- Cadena de frío IoT (cadencia 5 s, 80 lecturas en la demo) con alerta fuera de 0–4 °C
+- 20/20 tests STRIDE (spoofing, tampering, replay, elevación de privilegio)
 
 ```
 INTEGRAlab/
-├── nodes/                   # Backend (ledger, PKI, endorsement)
-├── dashboard/               # Frontend (Next.js + React)
-├── iot-simulator/           # Generador de telemetría
-├── ca/                      # Autoridad de certificación
-├── tests/                   # Test suite (20 tests STRIDE)
-├── scripts/                 # Utilidades (reset, setup)
-├── docs/                    # Documentación académica
-│   └── fundamentacion/      # 5 PDFs de análisis
-├── PASOS_DETALLADOS.md      # Tutorial paso a paso
-├── PASOS_DE_ATAQUES.md      # Escenarios de ataque
-├── GUIA_DE_USO_ATAQUES.md   # Uso del script de ataques
-├── DIAGNOSTICO_TESTS.md     # Estado de tests
-└── README.md                # Este archivo
+├── nodes/  dashboard/  iot-simulator/  ca/  tests/  scripts/
+├── docs/fundamentacion/     # PDFs académicos
+├── docs/DECISIONES_DE_ALCANCE.md
+├── pantallas/                 # capturas de este README
+├── PASOS_DETALLADOS.md
+├── PASOS_DE_ATAQUES.md
+├── DIAGNOSTICO_TESTS.md
+└── README.md
 ```
 
----
-
-
-
-## 🛠️ Stack Tecnológico
-
-**Backend:** Node.js 18 + Express + node-forge (PKI) + Crypto (SHA-256)
-
-**Frontend:** Next.js 14 + React 18 + TypeScript + Tailwind + Recharts
-
-**Testing & Deployment:** Docker Compose + Bash scripts
+**Stack:** Node.js 18 + Express + node-forge · Next.js 14 + Tailwind + Recharts · Docker Compose
 
 ---
 
-### Trazabilidad — Gráfico de Telemetría en Tiempo Real
+Proyecto de investigación académica. Ver LICENSE.
 
-<div align="center">
-  <img src="./pantallas/trazabilidad2.jpg" alt="Gráfico de Telemetría" width="700">
-</div>
-
-Visualización en tiempo real de la telemetría del contenedor: temperatura, humedad y posición GPS. Incluye estadísticas (min, max, promedio) y alertas de desviaciones.
-
----
-
-
-
-## 📞 Soporte
-
-
-| Problema                            | Documento                                                          |
-| ----------------------------------- | ------------------------------------------------------------------ |
-| ¿Cómo empiezo?                      | `[PASOS_DETALLADOS.md](./PASOS_DETALLADOS.md)`                     |
-| ¿Por qué se rechazó mi transacción? | `[PASOS_DE_ATAQUES.md](./PASOS_DE_ATAQUES.md)`                     |
-| ¿Qué hacen los tests?               | `[DIAGNOSTICO_TESTS.md](./DIAGNOSTICO_TESTS.md)`                   |
-| ¿Hay errores al correr tests?       | `[GUIA_TEST_COMPLETO.md](./GUIA_TEST_COMPLETO.md)`                 |
-| ¿Por qué se tomó esta decisión?     | `[docs/DECISIONES_DE_ALCANCE.md](./docs/DECISIONES_DE_ALCANCE.md)` |
-
-
----
-
-
-
-## 📄 Licencia
-
-Proyecto de investigación académica. Ver LICENSE para detalles.
-
----
-
-**Última actualización:** 2 de septiembre 2026 
-
-**Tests:** ✅ 20/20 PASANDO
+**Actualizado:** 2 de septiembre 2026 · Tests: 20/20

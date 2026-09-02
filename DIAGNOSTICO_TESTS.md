@@ -152,31 +152,11 @@ Este es el flujo "correcto": los tests se ejecutan con acceso completo a Docker 
 
 ---
 
-## Checklist de verificación
+## Qué esperar
 
-- [x] GET /api/run-tests devuelve `available: true`
-- [x] POST /api/run-tests ejecuta los tests
-- [x] 15 tests pasan correctamente
-- [x] Botón de UI muestra resultados
-- [x] Docker-detect helper creado
-- [x] test16 modificado para hacer skip
-- [ ] test19 modificado para hacer skip
-- [ ] test17 verificado (sin docker?)
-- [ ] Verificación manual desde `/infra` con fix aplicado
+Desde `/infra` (contenedor): ~17/20, test16 y test19 **skip** (necesitan Docker en el host).
 
----
-
-## Recomendación final
-
-**Estado actual:** Botón funciona, tests parcialmente ejecutados
-**Recomendación:** Aplicar Opción 2 (skip gracefully para todos los tests que requieren Docker)
-
-Esto permite que los usuarios vean progreso desde `/infra` (15+ tests), mientras que los tests completos pueden ejecutarse desde el host:
-
-```bash
-# Desde /infra → 15-17 tests, skip los de Docker
-# Desde host → 20 tests, todos funcionan
-```
+Desde el host: `npm run test:seguridad` → 20/20.
 
 ---
 

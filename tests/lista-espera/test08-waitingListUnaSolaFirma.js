@@ -5,18 +5,14 @@
  */
 
 const { createAuthenticatedClient } = require('../helpers/http');
-const { waitingListEntry } = require('../helpers/fixtures');
-const crypto = require('crypto');
+const { makePatient } = require('../helpers/fixtures');
 
 async function run() {
   const name = 'test08_waitingListUnaSolaFirma';
 
   try {
     // Preparar payload
-    const payload = {
-      ...waitingListEntry,
-      patientId: 'test-patient-' + crypto.randomBytes(4).toString('hex'),
-    };
+    const payload = makePatient(8);
 
     // Obtener solo firma de coordinador-nacional
     const coordClient = createAuthenticatedClient('coordinador-nacional');

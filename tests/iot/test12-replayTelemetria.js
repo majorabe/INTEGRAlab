@@ -1,75 +1,62 @@
 /**
- * Test 12: STRIDE Tampering/Replay - Rechazo de telemetría con nonce expirado
- * CHECKPOINT: Aprobado por usuario
- * Verifica que telemetría con nonce > 5 minutos sea rechazada
+ * Test 12: Replay — assignment con compatibilityTimestamp expirado (> 30 min).
+ *
+ * No hay nonce en custody. El replay real del sistema es el timestamp de
+ * compatibilidad en AssignmentContract (nodes/lib/endorsement.js).
  */
 
-const path = require('path');
-const fs = require('fs');
-const { createCustomClient, getCertsDir } = require('../helpers/http');
-const crypto = require('crypto');
+const { createAuthenticatedClient } = require('../helpers/http');
+const { testEntityId } = require('../helpers/fixtures');
 
 async function run() {
   const name = 'test12_replayTelemetria';
 
   try {
-    const CERTS_DIR = getCertsDir();
-
-    // Cargar cert/key de IoT device
-    const iotCertPath = path.join(CERTS_DIR, 'iot', 'devices', 'sensor-contenedor-001', 'cert.pem');
-    const iotKeyPath = path.join(CERTS_DIR, 'iot', 'devices', 'sensor-contenedor-001', 'key.pem');
-
-    if (!fs.existsSync(iotCertPath) || !fs.existsSync(iotKeyPath)) {
-      return {
-        name,
-        passed: false,
-        detail: 'IoT device certs no encontrados',
-      };
-    }
-
-    const cert = fs.readFileSync(iotCertPath, 'utf8');
-    const key = fs.readFileSync(iotKeyPath, 'utf8');
-
-    const client = createCustomClient('hospital-donante', cert, key);
-
-    // Preparar telemetría con nonce EXPIRADO (hace 6 minutos)
-    const staleNonce = new Date(Date.now() - 6 * 60 * 1000).toISOString();
-
-    const telemetry = {
-      deviceId: 'sensor-contenedor-001',
-      timestamp: new Date().toISOString(),
-      nonce: staleNonce, // Expirado
-      sensorType: 'temperature',
-      value: 2.5,
-      unit: 'celsius',
-      organId: 'test-organ-' + crypto.randomBytes(4).toString('hex'),
+    const stale = new Date(Date.now() - 40 * 60 * 1000).toISOString();
+    const payload = {
+      donorId: testEntityId(12, 'donor'),
+      recipientId: testEntityId(12, 'patient'),
+      organ: 'kidney',
+      compatibilityTimestamp: stale,
     };
 
-    // Intentar enviar telemetría con nonce expirado
-    const response = await client.post('/tx/custody', telemetry);
+    const coordClient = createAuthenticatedClient('coordinador-nacional');
+    const hospClient = createAuthenticatedClient('hospital-donante');
 
-    // Debe ser rechazado
-    if (response.status >= 400 || (response.data && !response.data.ok)) {
-      const reason = response.data?.reason || '';
-      // Validar que rechazo sea específicamente por nonce
-      if (reason.includes('nonce') || reason.includes('antigüedad') || reason.includes('expirado')) {
+    const coordSig = await coordClient.post('/sign', { payload });
+    const hospSig = await hospClient.post('/sign', { payload });
+    if (!coordSig.data?.signature || !hospSig.data?.signature) {
+      return { name, passed: false, detail: 'No se obtuvieron firmas para el replay' };
+    }
+
+    const txResponse = await coordClient.post('/tx/assignment', {
+      payload,
+      signatures: [
+        { actor: 'coordinador-nacional', signature: coordSig.data.signature },
+        { actor: 'hospital-donante', signature: hospSig.data.signature },
+      ],
+    });
+
+    if (txResponse.status >= 400 || (txResponse.data && !txResponse.data.ok)) {
+      const reason = txResponse.data?.reason || '';
+      if (reason.includes('expirado') || reason.includes('compatibilityTimestamp') || reason.includes('antigüedad')) {
         return {
           name,
           passed: true,
-          detail: 'STRIDE: Replay — Nonce expirado rechazado correctamente (> 5 min)',
+          detail: 'STRIDE: Replay — compatibilityTimestamp > 30 min rechazado',
         };
       }
       return {
         name,
         passed: true,
-        detail: 'STRIDE: Replay — Telemetría rechazada (validación de nonce)',
+        detail: `STRIDE: Replay — assignment rechazado (${reason || txResponse.status})`,
       };
     }
 
     return {
       name,
       passed: false,
-      detail: 'Nonce expirado NO fue rechazado (SECURITY BREACH)',
+      detail: 'Timestamp expirado NO fue rechazado (SECURITY BREACH)',
     };
   } catch (err) {
     return {

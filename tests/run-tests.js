@@ -102,7 +102,7 @@ async function runTest(testPath) {
  * Formatea output de un test para consola
  */
 function formatTestResult(result) {
-  const status = result.passed ? '✔' : '✘';
+  const status = result.skipped ? '↷' : result.passed ? '✔' : '✘';
   const timeStr = `${result.ms}ms`;
   return `${status} ${result.name.padEnd(50)} — ${result.detail} (${timeStr})`;
 }
@@ -128,6 +128,7 @@ async function runTestSuite() {
   const results = [];
   let totalTests = 0;
   let passedTests = 0;
+  let skippedTests = 0;
 
   // Ejecutar tests por bloque
   for (const block of TEST_BLOCKS) {
@@ -141,7 +142,9 @@ async function runTestSuite() {
 
       console.log(formatTestResult(result));
 
-      if (result.passed) {
+      if (result.skipped) {
+        skippedTests++;
+      } else if (result.passed) {
         passedTests++;
       }
     }
@@ -151,10 +154,9 @@ async function runTestSuite() {
   console.log('\n========================================');
   console.log('RESUMEN');
   console.log('========================================\n');
-  console.log(`Total: ${passedTests}/${totalTests} PASS\n`);
+  const failedTests = results.filter((r) => !r.passed && !r.skipped);
+  console.log(`Total: ${passedTests}/${totalTests} PASS${skippedTests ? ` (${skippedTests} saltados)` : ''}\n`);
 
-  // Detalles de tests fallidos
-  const failedTests = results.filter(r => !r.passed);
   if (failedTests.length > 0) {
     console.log('Tests Fallidos:');
     failedTests.forEach(test => {
@@ -163,7 +165,22 @@ async function runTestSuite() {
     console.log('');
   }
 
-  process.exit(passedTests === totalTests ? 0 : 1);
+  const summary = {
+    passed: passedTests,
+    total: totalTests,
+    skipped: skippedTests,
+    failed: failedTests.map((t) => ({ name: t.name, detail: t.detail })),
+    tests: results.map((r) => ({
+      name: r.name,
+      passed: Boolean(r.passed),
+      skipped: Boolean(r.skipped),
+      detail: r.detail || '',
+      ms: r.ms || 0,
+    })),
+  };
+  console.log(`__SUITE_JSON__${JSON.stringify(summary)}`);
+
+  process.exit(failedTests.length === 0 ? 0 : 1);
 }
 
 // Ejecutar

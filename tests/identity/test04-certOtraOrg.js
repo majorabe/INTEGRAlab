@@ -6,7 +6,7 @@
 
 const { createCustomClient } = require('../helpers/http');
 const { generateWrongOrgCert } = require('../helpers/certs');
-const { donorPayload } = require('../helpers/fixtures');
+const { makeDonor } = require('../helpers/fixtures');
 
 async function run() {
   const name = 'test04_certOtraOrg';
@@ -19,7 +19,7 @@ async function run() {
     const client = createCustomClient('hospital-donante', cert, key);
 
     // Intentar enviar como donante-registry (solo hospital-donante puede)
-    const response = await client.post('/tx/donor-registry', donorPayload);
+    const response = await client.post('/tx/donor-registry', makeDonor(4));
 
     // Debe ser rechazado por falta de firma de hospital-donante
     if (response.status >= 400 || (response.data && !response.data.ok)) {

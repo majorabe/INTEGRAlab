@@ -171,11 +171,11 @@ No vas a completar formularios en la web. El script escribe por vos, de una sola
 
 Imaginá un único caso de trasplante de riñón, no un padrón nacional:
 
-1. **Se registra un donante** (`demo-pitch-donor-001`). Quedan grabados grupo sanguíneo, órgano (riñón), HLA y método de preservación.
-2. **Se carga un paciente en lista de espera** (`demo-pitch-patient-001`). Quedan grabados grupo sanguíneo, HLA y urgencia (3 de 5). En esta demo **hay un solo candidato**, no una grilla de cientos de personas.
+1. **Se registra un donante** (`demo-donor-001`). Quedan grabados grupo sanguíneo, órgano (riñón), HLA y método de preservación. Son datos de demostración (no un paciente real).
+2. **Se cargan tres pacientes en lista de espera** (`demo-patient-001`, `002`, `003`) con sangre, HLA y urgencia distintos. El motor elige a `001` (mejor HLA). `002` y `003` quedan **en espera**.
 3. **Se mira si son compatibles** (grupo y HLA). Eso no graba nada: solo obtiene un “sello de hora” para poder asignar.
-4. **Se asigna el órgano** de ese donante a ese paciente. Recién ahí el órgano “sale” a transitar.
-5. **Arranca el sensor de temperatura** del contenedor. Escribe unas pocas lecturas de frío (incluye una alerta en la #5).
+4. **Se asigna el órgano** de ese donante a `demo-patient-001`. Recién ahí el órgano “sale” a transitar.
+5. **Arranca el sensor de temperatura** del contenedor. **80** lecturas a **1 cada 5 s** (~7 min de viaje; la alerta de frío cae a mitad de trayecto). El envío se comprime para no esperar el reloj real.
 6. **El hospital receptor confirma la llegada**. Ese bloque cierra la trazabilidad. El script **detiene el IoT**: la altura del ledger deja de subir.
 
 Esos pasos son el script. Vos no los ves uno a uno en el dashboard mientras corre: al terminar, el caso ya está **cerrado**.
@@ -189,15 +189,15 @@ Después del script, **refrescá** `/infra` y `/dashboard`. `/dashboard` muestra
 | ----------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
 | Red (nodos, altura, hashes, tests)                          | `http://localhost:3000/infra`                                | Los 4 nodos, quorum, consistencia. Altura estable (el IoT ya no escribe).                               |
 | Tablero clínico                                             | `http://localhost:3000/dashboard`                            | Donante entregado, paciente recibido, match HLA, contenedor cerrado.                                    |
-| Ficha completa (gráfico de temperatura, línea de tiempo)    | `http://localhost:3000/dashboard/casos/demo-pitch-donor-001` | Ciclo hasta **Recepción**. También sirve el ID `demo-pitch-patient-001`.                                |
+| Ficha completa (gráfico de temperatura, lecturas, línea de tiempo) | `http://localhost:3000/dashboard/casos/demo-donor-001` | Un solo caso: donante → paciente asignado. |
 
 
 En `/dashboard` deberías reconocer:
 
-- 1 donante `demo-pitch-donor-001` (O+, riñón) con estado **Entregado**
-- 1 paciente `demo-pitch-patient-001` con estado **Recibido**
-- Asignación con score HLA y píldora **Recibido**
-- Contenedor **Entregado** / circuito cerrado
+- 1 donante `demo-donor-001` (O+, riñón) con estado **Entregado**
+- 3 pacientes en lista: `demo-patient-001` **órgano recibido**; `002` y `003` **en espera**
+- Asignación con ranking HLA y píldora de recepción en hospital
+- Contenedor `sensor-contenedor-001` (`iot:sensor-contenedor-001`) y tabla de lecturas
 - En la ficha: las 5 etapas (Donante → Lista → Asignación → Traslado → Recepción) en teal
 
 Si el tablero dice “Sin actividad clínica”, el script no corrió o el ledger se reseteó.
@@ -215,22 +215,22 @@ bash scripts/setup-demo-pitch-data.sh
 
 | Paso del script                                   | Endpoint                                           | ¿Bloque?                                      |
 | ------------------------------------------------- | -------------------------------------------------- | --------------------------------------------- |
-| Firmar + registrar donante `demo-pitch-donor-001` | `/sign` + `/tx/donor-registry`                     | 1 (`donor-registry`)                          |
-| Firmar + lista `demo-pitch-patient-001`           | `/sign` ×2 + `/tx/waiting-list`                    | 1 (`waiting-list`, 2 orgs)                    |
+| Firmar + registrar donante `demo-donor-001` | `/sign` + `/tx/donor-registry`                     | 1 (`donor-registry`)                          |
+| Firmar + lista (3 pacientes)                      | `/sign` ×2 + `/tx/waiting-list` ×3                 | 3 (`waiting-list`)                            |
 | Compatibilidad HLA                                | `/compatibility/query`                             | **0** (solo timestamp)                        |
 | Asignación (nacional + hospital-donante)          | `/tx/assignment`                                   | 1 (`assignment`) = **inicio de trazabilidad** |
 | Arrancar IoT                                      | `docker compose --profile iot up -d iot-simulator` | `custody` (unas lecturas, ~5 s c/u)           |
-| Esperar ≥5 lecturas                               | `GET /dashboard/overview`                          | **0** (solo espera)                           |
+| Esperar 80 lecturas (1 cada 5 s)                  | `GET /dashboard/overview`                          | **0** (solo espera)                           |
 | Recepción (receptor + coordinador nacional)       | `/tx/reception`                                    | 1 (`reception`) = **cierre de trazabilidad**  |
 | Detener IoT                                       | `docker compose --profile iot stop iot-simulator`  | no hay más bloques                            |
 
 
-El simulador espera assignment en `GET /dashboard/casos/demo-pitch-donor-001`, después manda lecturas con `organId=demo-pitch-donor-001`. Lectura #5 puede salir de rango (alerta de frío). Tras la recepción, el nodo **rechaza** más custody y el script para el contenedor.
+El simulador espera assignment en `GET /dashboard/casos/demo-donor-001`, después manda lecturas con `organId=demo-donor-001`. A mitad de viaje (~lectura 40) puede salir de rango (alerta de frío). Tras la recepción, el nodo **rechaza** más custody y el script para el contenedor.
 
 ### Qué esperar en consola
 
 ```
-SETUP: caso clínico demo-pitch
+SETUP: caso clínico demo
 ✓ Donante registrado
 ✓ Paciente en lista de espera
 ✓ compatibilityTimestamp=...
@@ -259,7 +259,7 @@ Altura: 3
 Al terminar el script:
 
 ```
-#3 … #N   custody   organId = demo-pitch-donor-001
+#3 … #N   custody   organId = demo-donor-001
 #N+1      reception hospital-receptor
 Altura: estable (el IoT ya no escribe)
 ```
@@ -281,7 +281,7 @@ Abrí **los dos**:
 - `http://localhost:3000/infra` — nodos, quorum, altura **estable**
 - `http://localhost:3000/dashboard` — caso **recibido**, contenedor cerrado
 
-Ficha con gráfico: `http://localhost:3000/dashboard/casos/demo-pitch-donor-001`
+Ficha con gráfico: `http://localhost:3000/dashboard/casos/demo-donor-001`
 
 ### Qué esperar
 
@@ -330,7 +330,7 @@ bash scripts/setup-demo-pitch-data.sh
         ↓  donante + lista + asignación + custody + recepción; IoT detenido
 http://localhost:3000/infra  y  /dashboard
         ↓  caso cerrado; altura estable
-http://localhost:3000/dashboard/casos/demo-pitch-donor-001
+http://localhost:3000/dashboard/casos/demo-donor-001
         ↓  ficha con gráfico y etapa Recepción
 curl /verify-integrity  →  valid: true
 ```

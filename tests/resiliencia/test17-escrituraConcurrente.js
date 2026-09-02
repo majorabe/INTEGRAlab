@@ -5,8 +5,7 @@
  */
 
 const { createAuthenticatedClient } = require('../helpers/http');
-const { donorPayload } = require('../helpers/fixtures');
-const crypto = require('crypto');
+const { donorPayload, testEntityId } = require('../helpers/fixtures');
 
 async function run() {
   const name = 'test17_escrituraConcurrente';
@@ -16,9 +15,9 @@ async function run() {
 
     // Preparar múltiples payloads de transacciones
     const numConcurrent = 5;
-    const payloads = Array.from({ length: numConcurrent }, () => ({
+    const payloads = Array.from({ length: numConcurrent }, (_, i) => ({
       ...donorPayload,
-      donorId: 'donor-concurrent-' + crypto.randomBytes(4).toString('hex'),
+      donorId: testEntityId(17, 'donor', String(i + 1)),
     }));
 
     // Obtener firmas para todos los payloads

@@ -6,7 +6,7 @@ import { Activity, HeartPulse, Thermometer, Users } from 'lucide-react'
 import { IOT_HEALTH_URL } from '@/lib/iot-health'
 import { getReadClient } from '@/lib/read-client'
 import { organLabel } from '@/lib/ui-labels'
-import type { IotHealth, LedgerOverview, OverviewAssignment, RoleType } from '@/lib/types'
+import type { CustodySample, IotHealth, LedgerOverview, MatchCandidate, OverviewAssignment, RoleType } from '@/lib/types'
 import { StatusPill } from '@/components/StatusPill'
 
 function formatHla(p: { A?: string; B?: string; DR?: string } | null | undefined): string {
@@ -184,7 +184,7 @@ export function ClinicalBoard({ role = 'coordinador-nacional' }: { role?: RoleTy
                       <tr key={p.patientId} className="border-t">
                         <td className="py-3 pr-3">
                           <Link
-                            href={`/dashboard/casos/${encodeURIComponent(p.patientId)}`}
+                            href={`/dashboard/casos/${encodeURIComponent(p.assignedDonorId || p.patientId)}`}
                             className="font-medium underline-offset-2 hover:underline"
                           >
                             {p.patientId}
@@ -202,7 +202,7 @@ export function ClinicalBoard({ role = 'coordinador-nacional' }: { role?: RoleTy
                             }
                           >
                             {p.status === 'recibido'
-                              ? 'Recibido'
+                              ? 'Órgano recibido'
                               : p.status === 'asignado'
                                 ? 'Asignado'
                                 : 'En espera'}
@@ -219,7 +219,13 @@ export function ClinicalBoard({ role = 'coordinador-nacional' }: { role?: RoleTy
           {assignment && (
             <section className="rounded-lg border bg-card p-5">
               <h2 className="text-lg font-semibold">Compatibilidad</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Filtro de sangre, luego coincidencia HLA (loci A, B, DR) y urgencia como desempate.
+              </p>
               <AssignmentPanel assignment={assignment} />
+              {(overview?.matchRanking?.length ?? 0) > 0 && (
+                <RankingTable rows={overview!.matchRanking!} />
+              )}
             </section>
           )}
 
@@ -233,26 +239,25 @@ export function ClinicalBoard({ role = 'coordinador-nacional' }: { role?: RoleTy
                   {delivered ? 'Entregado' : iotUp ? (tempAlert ? 'Fuera de rango' : 'Activo') : 'Inactivo'}
                 </StatusPill>
               </div>
-              <div className="mt-4 grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+                <Metric
+                  label="Dispositivo"
+                  value={assignment?.custody?.deviceId || iot?.deviceId || 'sensor-contenedor-001'}
+                />
+                <Metric
+                  label="Identidad PKI"
+                  value={assignment?.custody?.deviceActor || `iot:${assignment?.custody?.deviceId || iot?.deviceId || 'sensor-contenedor-001'}`}
+                />
                 <Metric
                   label="Temperatura"
                   value={lastTemp != null ? `${lastTemp} °C` : '—'}
                   alert={tempAlert}
                 />
                 <Metric label="Lecturas" value={String(counts?.custodyReadings ?? 0)} />
-                <Metric
-                  label="Estado"
-                  value={
-                    delivered
-                      ? 'Circuito cerrado'
-                      : iotUp
-                        ? iot?.phase === 'escribiendo'
-                          ? 'Transmitiendo'
-                          : 'En espera'
-                        : 'Sin señal'
-                  }
-                />
               </div>
+              {(assignment?.custody?.samples?.length ?? 0) > 0 && (
+                <ReadingsTable samples={assignment!.custody!.samples!} />
+              )}
             </section>
           )}
         </>
@@ -313,11 +318,97 @@ function Stat({
   )
 }
 
+function RankingTable({ rows }: { rows: MatchCandidate[] }) {
+  return (
+    <div className="mt-6 overflow-x-auto">
+      <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Candidatos ordenados</p>
+      <table className="w-full text-base">
+        <thead className="text-xs uppercase tracking-wide text-muted-foreground">
+          <tr>
+            <th className="text-left font-medium py-2 pr-3">#</th>
+            <th className="text-left font-medium py-2 pr-3">Paciente</th>
+            <th className="text-left font-medium py-2 pr-3">Sangre</th>
+            <th className="text-left font-medium py-2 pr-3">HLA</th>
+            <th className="text-left font-medium py-2 pr-3">Score</th>
+            <th className="text-left font-medium py-2 pr-3">Urgencia</th>
+            <th className="text-left font-medium py-2">Resultado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, i) => (
+            <tr key={row.patientId} className="border-t">
+              <td className="py-2 pr-3 text-muted-foreground">{i + 1}</td>
+              <td className="py-2 pr-3 font-medium">{row.patientId}</td>
+              <td className="py-2 pr-3">{row.bloodType ?? '—'}</td>
+              <td className="py-2 pr-3 font-mono text-sm">{formatHla(row.hlaProfile)}</td>
+              <td className="py-2 pr-3 tabular-nums">{Math.round(row.hlaScore)}</td>
+              <td className="py-2 pr-3">{row.urgencyLevel ?? '—'}/5</td>
+              <td className="py-2">
+                {row.selected ? (
+                  <StatusPill tone="success">Asignado</StatusPill>
+                ) : (
+                  <span className="text-sm text-muted-foreground">No elegido</span>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function ReadingsTable({ samples }: { samples: CustodySample[] }) {
+  const ordered = [...samples].sort((a, b) => a.secuencia - b.secuencia)
+  const shown =
+    ordered.length <= 80
+      ? ordered
+      : [
+          ...ordered.slice(0, 2),
+          ...ordered.filter((s) => s.fueraDeRango),
+          ...ordered.slice(-8),
+        ].filter((s, i, arr) => arr.findIndex((x) => x.secuencia === s.secuencia) === i)
+          .sort((a, b) => a.secuencia - b.secuencia)
+  return (
+    <div className="mt-5 overflow-x-auto">
+      {ordered.length > shown.length && (
+        <p className="text-sm text-muted-foreground mb-2">
+          {ordered.length} lecturas. Se muestran inicio, alerta y final.
+        </p>
+      )}
+      <table className="w-full text-base">
+        <thead className="text-xs uppercase tracking-wide text-muted-foreground">
+          <tr>
+            <th className="text-left font-medium py-2 pr-3">#</th>
+            <th className="text-left font-medium py-2 pr-3">Hora</th>
+            <th className="text-left font-medium py-2 pr-3">Temp.</th>
+            <th className="text-left font-medium py-2 pr-3">Humedad</th>
+            <th className="text-left font-medium py-2">Alerta</th>
+          </tr>
+        </thead>
+        <tbody>
+          {shown.map((s) => (
+            <tr key={`${s.secuencia}-${s.timestamp}`} className="border-t">
+              <td className="py-2 pr-3 tabular-nums">{s.secuencia}</td>
+              <td className="py-2 pr-3 text-sm">{formatWhen(s.timestamp)}</td>
+              <td className={`py-2 pr-3 font-medium ${s.fueraDeRango ? 'text-red-700' : ''}`}>
+                {s.temperaturaC != null ? `${s.temperaturaC} °C` : '—'}
+              </td>
+              <td className="py-2 pr-3">{s.humedadPct != null ? `${s.humedadPct} %` : '—'}</td>
+              <td className="py-2">{s.fueraDeRango ? <StatusPill tone="danger">Fuera de rango</StatusPill> : '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 function Metric({ label, value, alert }: { label: string; value: string; alert?: boolean }) {
   return (
     <div>
       <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className={`mt-1 text-xl font-semibold ${alert ? 'text-red-700' : ''}`}>{value}</p>
+      <p className={`mt-1 text-base font-semibold break-all ${alert ? 'text-red-700' : ''}`}>{value}</p>
     </div>
   )
 }
@@ -336,12 +427,7 @@ function AssignmentPanel({ assignment }: { assignment: OverviewAssignment }) {
         <span className="text-muted-foreground" aria-hidden>
           →
         </span>
-        <Link
-          href={`/dashboard/casos/${encodeURIComponent(assignment.recipientId)}`}
-          className="font-medium underline-offset-2 hover:underline"
-        >
-          {assignment.recipientId}
-        </Link>
+        <span className="font-medium">{assignment.recipientId}</span>
         {assignment.organ ? <StatusPill tone="info">{organLabel(assignment.organ)}</StatusPill> : null}
         {assignment.received ? <StatusPill tone="success">Recibido</StatusPill> : null}
       </div>

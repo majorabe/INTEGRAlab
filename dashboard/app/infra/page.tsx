@@ -9,9 +9,17 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { AlertTriangle, CheckCircle2, RefreshCw, Server, ShieldAlert, XCircle } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, MinusCircle, RefreshCw, Server, ShieldAlert, XCircle } from 'lucide-react'
 import { AUTO_REFRESH_MS, NODES, ORDERER_ID, QUORUM_NODOS, TOTAL_NODOS } from './nodes.config'
 import { pingAllNodes, type NodeSnapshot, type NodeStatus } from './ping-node'
+
+interface TestResult {
+  name: string
+  passed: boolean
+  skipped?: boolean
+  detail: string
+  ms?: number
+}
 
 interface FailedTest {
   name: string
@@ -26,10 +34,35 @@ interface SuiteResult {
   passed: number
   total: number
   failed: FailedTest[]
+  tests?: TestResult[]
+  skipped?: number
   stdout: string
   stderr: string
   exitCode: number | null
   durationMs: number
+}
+
+const ATTACK_DEMOS: Array<{ id: string; title: string; tests: string[] }> = [
+  { id: 'A1', title: 'Firma falsa', tests: ['test02_rechazoSpoofing'] },
+  { id: 'A2', title: 'Identidad de otra org', tests: ['test04_certOtraOrg'] },
+  { id: 'A3', title: 'Firma alterada / ausente', tests: ['test06_donorRegistrySinFirma'] },
+  { id: 'A4', title: 'Waiting-list con 1 firma', tests: ['test08_waitingListUnaSolaFirma'] },
+  { id: 'A5', title: 'Assignment sin hospital', tests: ['test09_assignmentSinEndorsement'] },
+  { id: 'A6', title: 'Lectura sin actor', tests: ['test13_lecturaNoAutorizada'] },
+  { id: 'A7', title: 'IoT en waiting-list', tests: ['test14_iotNoEscribeWaitingList'] },
+  { id: 'A8', title: 'Replay de timestamp', tests: ['test12_replayTelemetria'] },
+]
+
+function attackOutcome(
+  tests: TestResult[] | undefined,
+  names: string[]
+): 'pass' | 'fail' | 'skip' | 'pending' {
+  if (!tests?.length) return 'pending'
+  const hits = tests.filter((t) => names.includes(t.name))
+  if (!hits.length) return 'pending'
+  if (hits.some((t) => !t.passed && !t.skipped)) return 'fail'
+  if (hits.every((t) => t.skipped)) return 'skip'
+  return 'pass'
 }
 
 type ConsistencyKind = 'consistent' | 'divergent' | 'partial' | 'insufficient'
@@ -205,6 +238,8 @@ export default function InfraPage() {
       tipTimestamp: null,
       isOrderer: Boolean(n.isOrderer),
       peers: [],
+      chainValid: null,
+      chainReason: null,
       error: null,
       lastSuccessAt: null,
       checkedAt: 0,
@@ -281,6 +316,7 @@ export default function InfraPage() {
   }, [])
 
   const consistency = useMemo(() => buildConsistency(snapshots), [snapshots])
+  const brokenChain = snapshots.filter((s) => s.chainValid === false)
 
   const orderer = snapshots.find((s) => s.id === ORDERER_ID) ?? snapshots.find((s) => s.isOrderer)
   const upCount = snapshots.filter((s) => s.status === 'up').length
@@ -391,6 +427,22 @@ export default function InfraPage() {
           )}
         </section>
 
+        {brokenChain.length > 0 && (
+          <section className="rounded-lg border border-red-500/60 bg-red-950/70 text-red-100 px-5 py-4" role="alert">
+            <p className="flex items-center gap-2 text-lg font-medium">
+              <ShieldAlert className="h-5 w-5" />
+              Integridad rota: el hash de al menos un bloque no coincide con su contenido
+            </p>
+            <ul className="mt-2 space-y-1 text-base">
+              {brokenChain.map((n) => (
+                <li key={n.id}>
+                  {n.label}: {n.chainReason ?? 'cadena inválida'}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
         <section className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div
             className={`rounded-lg border px-5 py-4 ${
@@ -486,6 +538,28 @@ export default function InfraPage() {
                     </dd>
                   </div>
                   <Row label="Último bloque" value={formatAgoIso(node.tipTimestamp, now)} />
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-zinc-500">Cadena</dt>
+                    <dd
+                      className={`text-right ${
+                        node.chainValid === false
+                          ? 'text-red-300'
+                          : node.ledgerHeight === 0
+                            ? 'text-zinc-500'
+                            : node.chainValid === true
+                              ? 'text-emerald-300'
+                              : 'text-zinc-500'
+                      }`}
+                    >
+                      {node.chainValid === false
+                        ? 'rota'
+                        : node.ledgerHeight === 0
+                          ? 'sin bloques'
+                          : node.chainValid === true
+                            ? 'íntegra'
+                            : '—'}
+                    </dd>
+                  </div>
                 </dl>
 
                 {node.error && (
@@ -502,7 +576,10 @@ export default function InfraPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold">Verificación de la red</h2>
-              <p className="text-sm text-zinc-400">Comprueba quorum, replicación y políticas de firma.</p>
+              <p className="text-sm text-zinc-400">
+                Suite de seguridad (identidad, endorsement, IoT, acceso, quorum). A1–A8 también:
+                <span className="font-mono text-zinc-300"> bash scripts/setup-demo-attack-scenarios.sh all</span>
+              </p>
             </div>
             <button
               type="button"
@@ -522,9 +599,48 @@ export default function InfraPage() {
 
           {testsRunning && (
             <p className="text-base text-zinc-300" aria-live="polite">
-              La verificación puede tardar un par de minutos.
+              La suite tiene 20 pruebas y puede tardar un par de minutos.
             </p>
           )}
+
+          <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 text-sm">
+            {ATTACK_DEMOS.map((a) => {
+              const outcome = attackOutcome(suite?.tests, a.tests)
+              const cls =
+                outcome === 'pass'
+                  ? 'border-emerald-700/50 bg-emerald-950/40 text-emerald-100'
+                  : outcome === 'fail'
+                    ? 'border-red-700/50 bg-red-950/40 text-red-100'
+                    : outcome === 'skip'
+                      ? 'border-amber-700/50 bg-amber-950/30 text-amber-100'
+                      : 'border-zinc-800 bg-zinc-950/40 text-zinc-300'
+              const mark = outcome === 'pass' ? '✓' : outcome === 'fail' ? '✘' : outcome === 'skip' ? '↷' : '·'
+              return (
+                <li key={a.id} className={`rounded border px-3 py-2 ${cls}`}>
+                  <p className="font-semibold">
+                    {mark} {a.id}
+                  </p>
+                  <p className="text-zinc-400 mt-0.5 leading-snug">{a.title}</p>
+                </li>
+              )
+            })}
+            <li
+              className={`rounded border px-3 py-2 ${
+                brokenChain.length > 0
+                  ? 'border-red-700/50 bg-red-950/40 text-red-100'
+                  : snapshots.some((s) => s.chainValid === true)
+                    ? 'border-emerald-700/50 bg-emerald-950/40 text-emerald-100'
+                    : 'border-zinc-800 bg-zinc-950/40 text-zinc-300'
+              }`}
+            >
+              <p className="font-semibold">
+                {brokenChain.length > 0 ? '✘' : snapshots.some((s) => s.chainValid === true) ? '✓' : '·'} A9
+              </p>
+              <p className="text-zinc-400 mt-0.5 leading-snug">
+                {brokenChain.length > 0 ? 'Cadena rota' : 'Cadena de hashes'}
+              </p>
+            </li>
+          </ul>
 
           {suiteHint && suiteAvailable === false && (
             <p className="text-base text-amber-100 bg-amber-950/50 border border-amber-500/40 rounded p-3">
@@ -541,7 +657,14 @@ export default function InfraPage() {
           {suite && (
             <div className="space-y-3">
               <p className={`text-xl font-semibold ${suite.ok ? 'text-emerald-300' : 'text-red-300'}`}>
-                {suite.total > 0 ? `${suite.passed}/${suite.total} correctas` : suite.timedOut ? 'Tiempo agotado' : 'Sin resumen'}
+                {suite.total > 0
+                  ? `${suite.passed}/${suite.total} correctas`
+                  : suite.timedOut
+                    ? 'Tiempo agotado'
+                    : 'Sin resumen'}
+                {suite.skipped ? (
+                  <span className="ml-2 text-base font-normal text-amber-200">({suite.skipped} saltados)</span>
+                ) : null}
                 {suite.durationMs != null && (
                   <span className="ml-2 text-base font-normal text-zinc-400">
                     ({Math.round(suite.durationMs / 1000)}s)
@@ -549,7 +672,28 @@ export default function InfraPage() {
                 )}
               </p>
 
-              {suite.failed?.length > 0 && (
+
+              {(suite.tests?.length ?? 0) > 0 && (
+                <ul className="space-y-1 text-sm max-h-80 overflow-auto rounded border border-zinc-800 bg-zinc-950/50 p-2">
+                  {suite.tests!.map((t) => (
+                    <li key={t.name} className="flex items-start gap-2 px-2 py-1.5">
+                      {t.skipped ? (
+                        <MinusCircle className="h-4 w-4 mt-0.5 shrink-0 text-amber-300" />
+                      ) : t.passed ? (
+                        <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0 text-emerald-400" />
+                      ) : (
+                        <XCircle className="h-4 w-4 mt-0.5 shrink-0 text-red-400" />
+                      )}
+                      <div className="min-w-0">
+                        <p className="font-medium text-zinc-100">{t.name}</p>
+                        {t.detail && <p className="text-zinc-400 break-words">{t.detail}</p>}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {!suite.tests?.length && suite.failed?.length > 0 && (
                 <div>
                   <h3 className="text-base font-medium text-red-200 mb-1">Fallos</h3>
                   <ul className="space-y-1 text-base">

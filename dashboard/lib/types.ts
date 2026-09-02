@@ -218,7 +218,17 @@ export interface OverviewPatient {
   hlaProfile: { A: string; B: string; DR: string } | null
   urgencyLevel: number | null
   addedToWaitingListAt: string
-  status: 'en-espera' | 'asignado' | string
+  status: 'en-espera' | 'asignado' | 'recibido' | string
+  assignedDonorId?: string | null
+}
+
+export interface CustodySample {
+  secuencia: number
+  timestamp: string
+  temperaturaC: number | null
+  humedadPct: number | null
+  fueraDeRango: boolean
+  deviceId: string | null
 }
 
 export interface OverviewCustody {
@@ -226,9 +236,11 @@ export interface OverviewCustody {
   readings: number
   alertCount?: number
   deviceId?: string
+  deviceActor?: string
   lastTimestamp?: string
   lastTempC?: number
   organo?: string
+  samples?: CustodySample[]
 }
 
 export interface OverviewAssignment {
@@ -248,12 +260,22 @@ export interface OverviewAssignment {
   receivedAt?: string | null
 }
 
+export interface MatchCandidate {
+  patientId: string
+  bloodType: string | null
+  hlaProfile: { A: string; B: string; DR: string } | null
+  urgencyLevel: number | null
+  hlaScore: number
+  selected: boolean
+}
+
 export interface LedgerOverview {
   ok: boolean
   donors: OverviewDonor[]
   waitingList: OverviewPatient[]
   assignments: OverviewAssignment[]
   custody: OverviewCustody[]
+  matchRanking?: MatchCandidate[]
   counts: {
     donors: number
     waiting: number

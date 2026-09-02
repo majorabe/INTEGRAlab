@@ -1,8 +1,8 @@
 ﻿/**
  * Suite de seguridad: `node tests/run-tests.js` en la raíz del repo.
  *
- * No corre dentro de la imagen Docker del dashboard (no hay /tests ni /nodes).
- * Un ledger vacío no es un error: los tests escriben sus propias transacciones.
+ * En Docker el repo se monta en INTEGRA_REPO_ROOT (/integralab). axios y
+ * node-forge salen de NODE_PATH (imagen del dashboard + node_modules del host).
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -10,6 +10,14 @@ import { spawn } from 'child_process'
 import fs from 'fs'
 import path from 'path'
 import { rejectUnlessLocalhost } from '../_lib/localhost'
+
+interface SuiteTest {
+  name: string
+  passed: boolean
+  skipped?: boolean
+  detail: string
+  ms?: number
+}
 
 function findRepoRoot(): string | null {
   const fromEnv = process.env.INTEGRA_REPO_ROOT
@@ -26,14 +34,71 @@ function findRepoRoot(): string | null {
   return null
 }
 
+function parseSuiteOutput(output: string): {
+  passed: number
+  total: number
+  skipped: number
+  failed: Array<{ name: string; detail: string }>
+  tests: SuiteTest[]
+} {
+  const marker = '__SUITE_JSON__'
+  const idx = output.lastIndexOf(marker)
+  if (idx >= 0) {
+    const raw = output.slice(idx + marker.length).trim().split('\n')[0]
+    try {
+      const parsed = JSON.parse(raw) as {
+        passed?: number
+        total?: number
+        skipped?: number
+        failed?: Array<{ name: string; detail: string }>
+        tests?: SuiteTest[]
+      }
+      const tests = parsed.tests ?? []
+      const failed =
+        parsed.failed ?? tests.filter((t) => !t.passed && !t.skipped).map((t) => ({ name: t.name, detail: t.detail }))
+      const total = parsed.total ?? tests.length
+      const skipped = parsed.skipped ?? tests.filter((t) => t.skipped).length
+      const passed = parsed.passed ?? tests.filter((t) => t.passed && !t.skipped).length
+      if (total > 0) return { passed, total, skipped, failed, tests }
+    } catch {
+      /* fallback below */
+    }
+  }
+
+  const summary = output.match(/Total:\s*(\d+)\s*\/\s*(\d+)\s+PASS/)
+  if (summary) {
+    return {
+      passed: Number(summary[1]),
+      total: Number(summary[2]),
+      skipped: 0,
+      failed: [],
+      tests: [],
+    }
+  }
+
+  return { passed: 0, total: 0, skipped: 0, failed: [], tests: [] }
+}
+
+function nodePathFor(root: string): string {
+  const parts = [
+    '/app/node_modules',
+    path.join(root, 'node_modules'),
+    path.join(root, 'dashboard', 'node_modules'),
+    process.env.NODE_PATH,
+  ].filter((p): p is string => Boolean(p))
+  return [...new Set(parts)].join(path.delimiter)
+}
+
 function unavailableBody() {
   return {
     ok: false,
     available: false,
     code: 'SUITE_NOT_IN_CONTAINER',
     passed: 0,
-    failed: 0,
+    failed: [] as Array<{ name: string; detail: string }>,
+    tests: [] as SuiteTest[],
     total: 0,
+    skipped: 0,
     exitCode: null,
     error:
       'No se encontró tests/run-tests.js. Si el dashboard corre en Docker, reconstruí: docker compose up --build -d dashboard. En el host: npm run test:seguridad',
@@ -52,7 +117,7 @@ export async function GET() {
     ok: true,
     available: true,
     command: 'npm run test:seguridad',
-    hint: 'Ledger vacío es normal. Los tests no piden bloques previos.',
+    hint: 'Ledger vacío es normal. Los tests no piden bloques previos. test16 y test19 se saltan dentro de Docker (hace falta el socket).',
   })
 }
 
@@ -66,9 +131,18 @@ export async function POST(request: NextRequest) {
   }
 
   const started = Date.now()
+  const inCompose = root === '/integralab' || process.env.INTEGRA_REPO_ROOT === '/integralab'
+  const childEnv: NodeJS.ProcessEnv = {
+    ...process.env,
+    NODE_PATH: nodePathFor(root),
+  }
+  if (inCompose) {
+    childEnv.INTEGRA_NODES_HOST_MODE = process.env.INTEGRA_NODES_HOST_MODE || 'compose'
+    childEnv.CERTS_DIR = process.env.CERTS_DIR || '/certs'
+  }
   const child = spawn('node', ['tests/run-tests.js'], {
     cwd: root,
-    env: { ...process.env },
+    env: childEnv,
   })
 
   let stdout = ''
@@ -80,7 +154,7 @@ export async function POST(request: NextRequest) {
     stderr += chunk.toString()
   })
 
-  const timeoutMs = 180000
+  const timeoutMs = 300000
   const result = await new Promise<{ code: number | null; timedOut: boolean }>((resolve) => {
     const timer = setTimeout(() => {
       child.kill('SIGTERM')
@@ -97,16 +171,17 @@ export async function POST(request: NextRequest) {
   })
 
   const output = stdout + stderr
-  const passed = output.split('\n').filter((l) => l.includes('✓') || l.includes('PASS')).length
-  const failedLines = output.split('\n').filter((l) => l.includes('✗') || l.includes('FAIL'))
+  const parsed = parseSuiteOutput(output)
 
   return NextResponse.json({
     ok: !result.timedOut && result.code === 0,
     available: true,
     timedOut: result.timedOut,
-    passed,
-    failed: failedLines.length,
-    total: passed + failedLines.length,
+    passed: parsed.passed,
+    failed: parsed.failed,
+    tests: parsed.tests,
+    total: parsed.total,
+    skipped: parsed.skipped,
     exitCode: result.code,
     durationMs: Date.now() - started,
     stdout: output,

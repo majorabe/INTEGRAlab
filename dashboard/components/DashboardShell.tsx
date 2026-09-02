@@ -3,23 +3,21 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { Activity, Server } from 'lucide-react'
-import { useRole } from '@/lib/role-context'
-import { ROLE_CONFIGS, getAvailableRoles } from '@/lib/roles'
+import { Server } from 'lucide-react'
 import { getReadClient } from '@/lib/read-client'
-import { NodeHealth, RoleType } from '@/lib/types'
+import { NodeHealth } from '@/lib/types'
 import { StatusPill } from '@/components/StatusPill'
 
+const CLINICAL_ORG = 'coordinador-nacional' as const
+
 export function DashboardShell({ children }: { children: React.ReactNode }) {
-  const { role, setRole } = useRole()
   const pathname = usePathname()
-  const config = ROLE_CONFIGS[role]
   const [health, setHealth] = useState<NodeHealth | null>(null)
   const [healthError, setHealthError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
-    const client = getReadClient(role)
+    const client = getReadClient(CLINICAL_ORG)
     client
       .getNodeHealth()
       .then((h) => {
@@ -37,7 +35,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true
     }
-  }, [role])
+  }, [])
 
   const nav = [
     { href: '/dashboard', label: 'Tablero' },
@@ -50,7 +48,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="border-b bg-card">
-        <div className={`h-1.5 ${config.color}`} aria-hidden />
         <div className="mx-auto max-w-6xl px-4 py-4 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-8">
             <div>
@@ -81,25 +78,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-3">
-            <label className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span className="whitespace-nowrap">Organización</span>
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value as RoleType)}
-                aria-label="Organización desde la que se consulta"
-                className="h-10 min-w-[13rem] rounded-md border border-input bg-background px-2 text-base text-foreground"
-              >
-                {getAvailableRoles().map((id) => (
-                  <option key={id} value={id}>
-                    {ROLE_CONFIGS[id].name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <StatusPill tone="neutral">Solo lectura</StatusPill>
             <span
               className={`h-2.5 w-2.5 rounded-full ${replicaOk ? 'bg-teal-600' : 'bg-red-500'}`}
-              title={replicaOk ? 'Réplica en línea' : 'Réplica sin respuesta'}
-              aria-label={replicaOk ? 'Réplica en línea' : 'Réplica sin respuesta'}
+              title={replicaOk ? 'Nodo de consulta en línea' : 'Nodo de consulta sin respuesta'}
+              aria-label={replicaOk ? 'Nodo de consulta en línea' : 'Nodo de consulta sin respuesta'}
             />
             <Link
               href="/infra"
@@ -111,22 +94,13 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             </Link>
           </div>
         </div>
-        <div className="mx-auto max-w-6xl px-4 pb-4 flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <Activity className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <p className="text-sm">
-              <span className="font-semibold">{config.name}</span>
-              <span className="text-muted-foreground"> · {config.description}</span>
-            </p>
-          </div>
-          {healthError ? (
+        {healthError && (
+          <div className="mx-auto max-w-6xl px-4 pb-3">
             <Link href="/infra" className="text-sm text-destructive underline-offset-2 hover:underline">
-              Esta organización no responde
+              El nodo de consulta no responde
             </Link>
-          ) : (
-            <StatusPill tone="neutral">Solo lectura</StatusPill>
-          )}
-        </div>
+          </div>
+        )}
       </header>
       <main className="mx-auto max-w-6xl px-4 py-8">{children}</main>
     </div>

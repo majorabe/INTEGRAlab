@@ -4,7 +4,7 @@
  */
 
 const { createAuthenticatedClient } = require('../helpers/http');
-const crypto = require('crypto');
+const { testEntityId } = require('../helpers/fixtures');
 
 async function run() {
   const name = 'test15_medicoNoEmiteAssignment';
@@ -15,8 +15,8 @@ async function run() {
     // Preparar payload de asignación
     const payload = {
       payload: {
-        donorId: 'test-donor-' + crypto.randomBytes(4).toString('hex'),
-        recipientId: 'test-patient-' + crypto.randomBytes(4).toString('hex'),
+        donorId: testEntityId(15, 'donor'),
+        recipientId: testEntityId(15, 'patient'),
         organ: 'kidney',
         compatibilityTimestamp: new Date().toISOString(),
       },

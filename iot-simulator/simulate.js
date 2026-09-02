@@ -13,11 +13,13 @@
  *   DEVICE_ID         - id del dispositivo (default sensor-contenedor-001)
  *   CERTS_DIR         - ruta al volumen de certificados (default /certs)
  *   CUSTODY_NODE_URL  - URL base del nodo custodiante
- *   INTERVALO_MS      - frecuencia de envío en ms (default 5000)
+ *   INTERVALO_MS      - pausa entre envíos (demo; default 80). No es la cadencia del viaje.
+ *   CADENCIA_REAL_MS  - tiempo simulado entre lecturas (default 5000 = 5 s).
+ *   VIAJE_MS          - duración simulada del traslado (default LECTURAS_MAX * cadencia).
  *   ORGANO            - tipo de órgano transportado (default rinon)
  *   ORGAN_ID          - donorId del órgano en tránsito (obligatorio)
- *   SIMULAR_FALLA_TEMP- si es "true", en la lectura #5 fuerza temperatura fuera de rango
- *   LECTURAS_MAX      - tope de lecturas (default 8). El traslado se cierra con `reception`.
+ *   SIMULAR_FALLA_TEMP- si es "true", a mitad de viaje fuerza temperatura fuera de rango
+ *   LECTURAS_MAX      - tope (default 80). Luego `reception`.
  */
 
 const fs = require("fs");
@@ -30,12 +32,18 @@ const DEVICE_ID = process.env.DEVICE_ID || "sensor-contenedor-001";
 const CERTS_DIR = process.env.CERTS_DIR || "/certs";
 const CUSTODY_NODE_URL = process.env.CUSTODY_NODE_URL || "http://hospital-donante:3000";
 
-const INTERVALO_MS = parseInt(process.env.INTERVALO_MS || "5000", 10);
+const INTERVALO_MS = parseInt(process.env.INTERVALO_MS || "80", 10);
+const CADENCIA_REAL_MS = parseInt(process.env.CADENCIA_REAL_MS || "5000", 10);
+const LECTURAS_MAX = parseInt(process.env.LECTURAS_MAX || "80", 10);
+const VIAJE_MS = parseInt(
+  process.env.VIAJE_MS || String(LECTURAS_MAX * CADENCIA_REAL_MS),
+  10
+);
 const ORGANO = process.env.ORGANO || "rinon";
 const ORGAN_ID = (process.env.ORGAN_ID || "").trim();
 const SIMULAR_FALLA_TEMP = process.env.SIMULAR_FALLA_TEMP === "true";
 const HEALTH_PORT = parseInt(process.env.HEALTH_PORT || "3010", 10);
-const LECTURAS_MAX = parseInt(process.env.LECTURAS_MAX || "8", 10);
+const LECTURA_ALERTA = Math.max(1, Math.round(LECTURAS_MAX / 2));
 
 const iotStatus = {
   deviceId: DEVICE_ID,
@@ -157,11 +165,11 @@ async function esperarAsignacion() {
   }
 }
 
-function generarLectura(secuencia) {
+function generarLectura(secuencia, tripStartMs) {
   const { min, max } = UMBRALES[ORGANO] || UMBRALES.rinon;
   let temperatura = +(min + Math.random() * (max - min)).toFixed(2);
 
-  if (SIMULAR_FALLA_TEMP && secuencia === 5) {
+  if (SIMULAR_FALLA_TEMP && secuencia === LECTURA_ALERTA) {
     temperatura = +(max + 1.2).toFixed(2);
   }
 
@@ -170,7 +178,7 @@ function generarLectura(secuencia) {
     organo: ORGANO,
     organId: ORGAN_ID,
     secuencia,
-    timestamp: new Date().toISOString(),
+    timestamp: new Date(tripStartMs + (secuencia - 1) * CADENCIA_REAL_MS).toISOString(),
     temperaturaC: temperatura,
     humedadPct: +(40 + Math.random() * 10).toFixed(1),
     gps: { lat: -32.9468 + Math.random() * 0.01, lon: -60.6393 + Math.random() * 0.01 },
@@ -178,8 +186,8 @@ function generarLectura(secuencia) {
   };
 }
 
-async function enviarLectura(secuencia) {
-  const payload = generarLectura(secuencia);
+async function enviarLectura(secuencia, tripStartMs) {
+  const payload = generarLectura(secuencia, tripStartMs);
   const deviceSignature = signPayload(payload);
 
   try {
@@ -220,11 +228,14 @@ async function trasladoCerrado() {
 async function main() {
   startHealthServer();
   console.log(
-    `[IoT ${DEVICE_ID}] listo. Destino: ${CUSTODY_NODE_URL}. Intervalo: ${INTERVALO_MS}ms. organId=${ORGAN_ID}`
+    `[IoT ${DEVICE_ID}] listo. Destino: ${CUSTODY_NODE_URL}. ` +
+      `Viaje simulado ${VIAJE_MS / 60000} min @ ${CADENCIA_REAL_MS}ms → ${LECTURAS_MAX} lecturas. ` +
+      `Envío cada ${INTERVALO_MS}ms. organId=${ORGAN_ID}`
   );
   const inicio = await esperarAsignacion();
   if (inicio === "recibido") return;
 
+  const tripStartMs = Date.now() - (LECTURAS_MAX - 1) * CADENCIA_REAL_MS;
   let secuencia = 0;
   while (secuencia < LECTURAS_MAX) {
     if (await trasladoCerrado()) {
@@ -234,7 +245,7 @@ async function main() {
       return;
     }
     secuencia += 1;
-    const result = await enviarLectura(secuencia);
+    const result = await enviarLectura(secuencia, tripStartMs);
     if (result === "cerrado") {
       iotStatus.phase = "entregado";
       console.log(`[IoT ${DEVICE_ID}] traslado cerrado. No se envían más lecturas.`);

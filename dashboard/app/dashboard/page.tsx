@@ -11,7 +11,7 @@ export default function DashboardHome() {
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Tablero clínico</h1>
         <p className="text-base text-muted-foreground mt-1 max-w-2xl">
-          Donantes, lista de espera y órganos en traslado. La salud de los nodos está en Red.
+          Donantes, lista de espera y órganos en traslado. 
         </p>
       </div>
 

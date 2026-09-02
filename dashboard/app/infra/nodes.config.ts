@@ -34,5 +34,6 @@ export const NODES: InfraNode[] = [
 ]
 
 export const HEALTH_PATH = '/health'
+export const INTEGRITY_PATH = '/verify-integrity'
 export const FETCH_TIMEOUT_MS = 5000
 export const AUTO_REFRESH_MS = 5000

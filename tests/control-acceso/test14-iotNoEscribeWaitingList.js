@@ -6,7 +6,7 @@
 const path = require('path');
 const fs = require('fs');
 const { createCustomClient, getCertsDir } = require('../helpers/http');
-const crypto = require('crypto');
+const { testEntityId } = require('../helpers/fixtures');
 
 async function run() {
   const name = 'test14_iotNoEscribeWaitingList';
@@ -34,7 +34,7 @@ async function run() {
     // Preparar payload para waiting-list
     const payload = {
       payload: {
-        patientId: 'test-patient-' + crypto.randomBytes(4).toString('hex'),
+        patientId: testEntityId(14, 'patient'),
         bloodType: 'O+',
         hlaProfile: { A: 'A2', B: 'B7', DR: 'DR4' },
         urgencyLevel: 3,

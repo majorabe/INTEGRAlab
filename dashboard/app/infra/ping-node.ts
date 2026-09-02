@@ -1,4 +1,4 @@
-import { FETCH_TIMEOUT_MS, HEALTH_PATH, type InfraNode } from './nodes.config'
+import { FETCH_TIMEOUT_MS, HEALTH_PATH, INTEGRITY_PATH, type InfraNode } from './nodes.config'
 
 export type NodeStatus = 'up' | 'down' | 'timeout' | 'reject' | 'unknown'
 
@@ -29,6 +29,8 @@ export interface NodeSnapshot {
   isOrderer: boolean
   peers: string[]
   error: string | null
+  chainValid: boolean | null
+  chainReason: string | null
   lastSuccessAt: number | null
   checkedAt: number
   raw: unknown
@@ -66,12 +68,42 @@ function emptySnapshot(node: InfraNode, extras: Partial<NodeSnapshot>): NodeSnap
     tipTimestamp: null,
     isOrderer: Boolean(node.isOrderer),
     peers: [],
+    chainValid: null,
+    chainReason: null,
     error: null,
     lastSuccessAt: null,
     checkedAt: Date.now(),
     raw: null,
     endpoint: `GET ${HEALTH_PATH}`,
     ...extras,
+  }
+}
+
+async function fetchIntegrity(
+  node: InfraNode,
+  signal: AbortSignal
+): Promise<{ chainValid: boolean | null; chainReason: string | null }> {
+  try {
+    const res = await fetch(`${node.url}${INTEGRITY_PATH}`, {
+      method: 'GET',
+      signal,
+      cache: 'no-store',
+      mode: 'cors',
+    })
+    if (!res.ok) return { chainValid: null, chainReason: `HTTP ${res.status}` }
+    const body = (await res.json()) as { valid?: boolean; reason?: string; brokenAt?: number; length?: number }
+    if (body.valid === false) {
+      const at = typeof body.brokenAt === 'number' ? ` (bloque #${body.brokenAt})` : ''
+      return { chainValid: false, chainReason: `${body.reason || 'Cadena inválida'}${at}` }
+    }
+    // Ledger vacío: la API dice valid:true porque no hay hashes que fallar.
+    // No es una demostración de integridad; A9 queda pendiente hasta que haya bloques.
+    if (body.valid === true && typeof body.length === 'number' && body.length > 0) {
+      return { chainValid: true, chainReason: null }
+    }
+    return { chainValid: null, chainReason: null }
+  } catch {
+    return { chainValid: null, chainReason: null }
   }
 }
 
@@ -131,12 +163,15 @@ export async function pingNode(
   const started = performance.now()
 
   try {
-    const res = await fetch(`${node.url}${HEALTH_PATH}`, {
-      method: 'GET',
-      signal: controller.signal,
-      cache: 'no-store',
-      mode: 'cors',
-    })
+    const [res, integrity] = await Promise.all([
+      fetch(`${node.url}${HEALTH_PATH}`, {
+        method: 'GET',
+        signal: controller.signal,
+        cache: 'no-store',
+        mode: 'cors',
+      }),
+      fetchIntegrity(node, controller.signal),
+    ])
     const latencyMs = Math.round(performance.now() - started)
     const text = await res.text()
     let payload: HealthPayload | null = null
@@ -154,6 +189,8 @@ export async function pingNode(
         error: `HTTP ${res.status} ${res.statusText}${bodyPreview ? `: ${bodyPreview}` : ''} — el nodo responde pero rechaza`,
         lastSuccessAt: previous?.lastSuccessAt ?? null,
         raw: payload ?? text,
+        chainValid: integrity.chainValid,
+        chainReason: integrity.chainReason,
       })
     }
 
@@ -165,6 +202,8 @@ export async function pingNode(
       error: null,
       lastSuccessAt: Date.now(),
       raw: payload ?? text,
+      chainValid: integrity.chainValid,
+      chainReason: integrity.chainReason,
     })
   } catch (err) {
     const latencyMs = Math.round(performance.now() - started)

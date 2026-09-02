@@ -5,8 +5,10 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center">
       <div className="mx-auto max-w-3xl px-6 py-16 w-full">
-        <p className="text-xs uppercase tracking-[0.22em] text-zinc-500">INTEGRA</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight">Coordinación de trasplantes</h1>
+        <p className="text-xs uppercase tracking-[0.50em] text-zinc-500">INTEGRA</p>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight">
+        Infraestructura de Trazabilidad e Identidad<br/> para la Gestión de Recursos de Asignación
+        </h1>
         <p className="mt-3 text-base text-zinc-400 max-w-xl">
           Dos vistas, una sola fuente de verdad: el ledger de la red.
         </p>

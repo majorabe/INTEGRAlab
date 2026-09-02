@@ -104,13 +104,10 @@ Para evitar conflictos entre data de pruebas (18 tests de seguridad, Fase 1), da
 
 | Prefijo | Uso | Ejemplo |
 |---------|-----|---------|
-| `test-*` | Tests de seguridad (Fase 1) | `test-donor-001`, `test-organ-xyz` |
-| `donor-concurrent-*` | Tests de concurrencia | `donor-concurrent-abc123` |
-| `donor-audit-*` | Tests de auditoría | `donor-audit-xyz` |
-| `donor-pre-*` | Otros tests pre-Fase2 | `donor-pre-xyz` |
-| `donor-dashboard-*` | Fase 1 dashboard tests | `donor-dashboard-1234` |
+| `test{NN}-{rol}-*` | Suite 01–20 (`rol` = donor, patient, organ) | `test05-donor-a3f2`, `test17-donor-3-b1c0` |
+| `test-dash-{rol}-*` | Endpoints del dashboard | `test-dash-donor-9e2d` |
 | **`demo-dev-*`** | **Desarrollo Fase 2 (interactivo)** | **`demo-dev-donor-001`, `demo-dev-patient-001`** |
-| **`demo-pitch-*`** | **Demo final para jurado (reservado)** | **`demo-pitch-donor-001`, `demo-pitch-patient-001`** |
+| **`demo-donor-*` / `demo-patient-*`** | **Demo clínica (pitch)** | **`demo-donor-001`, `demo-patient-001`** |
 
 **Reglas:**
 - Cada fase/feature usa su propio prefijo

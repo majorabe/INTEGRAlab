@@ -5,7 +5,7 @@
  */
 
 const { createAuthenticatedClient } = require('../helpers/http');
-const crypto = require('crypto');
+const { testEntityId } = require('../helpers/fixtures');
 
 async function run() {
   const name = 'test20_receptionCierraCircuito';
@@ -15,8 +15,8 @@ async function run() {
     const donante = createAuthenticatedClient('hospital-donante');
     const receptor = createAuthenticatedClient('hospital-receptor');
 
-    const donorId = 'donor-rx-' + crypto.randomBytes(4).toString('hex');
-    const patientId = 'patient-rx-' + crypto.randomBytes(4).toString('hex');
+    const donorId = testEntityId(20, 'donor');
+    const patientId = testEntityId(20, 'patient');
 
     const receptionPayload = {
       donorId,

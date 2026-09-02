@@ -14,9 +14,10 @@ COORDINADOR_URL="http://localhost:3001"
 HOSPITAL_DONANTE_URL="http://localhost:3003"
 HOSPITAL_RECEPTOR_URL="http://localhost:3004"
 
-# Generate unique IDs for this test run
-DONOR_ID="donor-dashboard-$(date +%s)"
-PATIENT_ID="patient-dashboard-$(date +%s)"
+# IDs: test-dash-{rol}-{xxxx} para seguirlos en /dashboard
+SUFFIX=$(openssl rand -hex 2 2>/dev/null || date +%s | tail -c 5)
+DONOR_ID="test-dash-donor-$SUFFIX"
+PATIENT_ID="test-dash-patient-$SUFFIX"
 
 echo "[1] Creating donor registry entry..."
 DONOR_PAYLOAD='{

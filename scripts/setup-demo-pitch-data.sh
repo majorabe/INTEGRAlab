@@ -2,8 +2,8 @@
 # Setup Demo Pitch Data para INTEGRAlab
 #
 # Escribe los HECHOS CLÍNICOS en el ledger (cada uno = 1 bloque replicado):
-#   1. donor-registry      → donante demo-pitch-donor-001
-#   2. waiting-list        → paciente demo-pitch-patient-001
+#   1. donor-registry      → donante demo-donor-001
+#   2. waiting-list        → 3 pacientes (demo-patient-001 asignado; 002 y 003 quedan en espera)
 #   3. assignment          → vínculo donante↔paciente (inicio de trazabilidad)
 #   4. custody             → lecturas IoT del traslado (tope corto)
 #   5. reception           → hospital receptor cierra el circuito
@@ -27,8 +27,10 @@ COORD_URL="http://localhost:3001"
 DONANTE_URL="http://localhost:3003"
 RECEPTOR_URL="http://localhost:3004"
 
-DONOR_ID="demo-pitch-donor-001"
-PATIENT_ID="demo-pitch-patient-001"
+DONOR_ID="demo-donor-001"
+PATIENT_ID="demo-patient-001"
+PATIENT_B_ID="demo-patient-002"
+PATIENT_C_ID="demo-patient-003"
 
 require_ok() {
   local label="$1"
@@ -43,7 +45,7 @@ require_ok() {
 }
 
 echo -e "${BLUE}========================================${NC}"
-echo -e "${BLUE}SETUP: caso clínico demo-pitch${NC}"
+echo -e "${BLUE}SETUP: caso clínico demo${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 
@@ -85,40 +87,65 @@ require_ok "donor-registry" "$DONOR_TX"
 echo -e "${GREEN}✓ Donante registrado: $DONOR_ID${NC}"
 sleep 1
 
-# --- 2. Lista de espera (1 bloque, 2 firmas) ---
-echo -e "${YELLOW}[3] waiting-list → 1 bloque (coordinador-nacional + hospital-donante)${NC}"
+add_waiting_list() {
+  local payload="$1"
+  local label="$2"
+  local coord_sig hosp_sig tx
+  coord_sig=$(curl -s -X POST "$COORD_URL/sign" \
+    -H "Content-Type: application/json" \
+    -d "{\"payload\":$payload}" | jq -r '.signature // empty')
+  hosp_sig=$(curl -s -X POST "$DONANTE_URL/sign" \
+    -H "Content-Type: application/json" \
+    -d "{\"payload\":$payload}" | jq -r '.signature // empty')
+  if [[ -z "$coord_sig" || -z "$hosp_sig" ]]; then
+    echo -e "${RED}✗ Fallo al firmar ${label}${NC}"
+    exit 1
+  fi
+  tx=$(curl -s -X POST "$COORD_URL/tx/waiting-list" \
+    -H "Content-Type: application/json" \
+    -d "{
+      \"payload\":$payload,
+      \"signatures\":[
+        {\"actor\":\"coordinador-nacional\",\"signature\":\"$coord_sig\"},
+        {\"actor\":\"hospital-donante\",\"signature\":\"$hosp_sig\"}
+      ]
+    }")
+  require_ok "waiting-list ${label}" "$tx"
+  echo -e "${GREEN}✓ En lista: ${label}${NC}"
+  sleep 1
+}
+
+# --- 2. Lista de espera (3 bloques, 2 firmas cada uno) ---
+# Donante: O+ / A2 · B7 · DR5
+# Ranking del motor: sangre (O+ dona a todos) → score HLA (loci A,B,DR) → urgencia.
+#   001: O+ A2 B7 DR4 urg 4 → HLA 67 (2/3)  ← se asigna
+#   003: O+ A2 B44 DR11 urg 2 → HLA 33 (1/3)
+#   002: A+ A1 B8 DR3 urg 5 → HLA 0 (0/3), más urgente pero peor match
+echo -e "${YELLOW}[3] waiting-list → 3 pacientes (coordinador-nacional + hospital-donante)${NC}"
+
 PATIENT_PAYLOAD='{
   "patientId":"'"$PATIENT_ID"'",
   "bloodType":"O+",
   "hlaProfile":{"A":"A2","B":"B7","DR":"DR4"},
-  "urgencyLevel":3
+  "urgencyLevel":4
 }'
+add_waiting_list "$PATIENT_PAYLOAD" "$PATIENT_ID (O+ HLA 2/3 urg 4 — será asignado)"
 
-COORD_SIG=$(curl -s -X POST "$COORD_URL/sign" \
-  -H "Content-Type: application/json" \
-  -d "{\"payload\":$PATIENT_PAYLOAD}" | jq -r '.signature // empty')
+PATIENT_B_PAYLOAD='{
+  "patientId":"'"$PATIENT_B_ID"'",
+  "bloodType":"A+",
+  "hlaProfile":{"A":"A1","B":"B8","DR":"DR3"},
+  "urgencyLevel":5
+}'
+add_waiting_list "$PATIENT_B_PAYLOAD" "$PATIENT_B_ID (A+ HLA 0/3 urg 5 — queda en espera)"
 
-PATIENT_SIG=$(curl -s -X POST "$DONANTE_URL/sign" \
-  -H "Content-Type: application/json" \
-  -d "{\"payload\":$PATIENT_PAYLOAD}" | jq -r '.signature // empty')
-
-if [[ -z "$COORD_SIG" || -z "$PATIENT_SIG" ]]; then
-  echo -e "${RED}✗ Fallo al firmar paciente${NC}"
-  exit 1
-fi
-
-PATIENT_TX=$(curl -s -X POST "$COORD_URL/tx/waiting-list" \
-  -H "Content-Type: application/json" \
-  -d "{
-    \"payload\":$PATIENT_PAYLOAD,
-    \"signatures\":[
-      {\"actor\":\"coordinador-nacional\",\"signature\":\"$COORD_SIG\"},
-      {\"actor\":\"hospital-donante\",\"signature\":\"$PATIENT_SIG\"}
-    ]
-  }")
-require_ok "waiting-list" "$PATIENT_TX"
-echo -e "${GREEN}✓ Paciente en lista de espera: $PATIENT_ID${NC}"
-sleep 1
+PATIENT_C_PAYLOAD='{
+  "patientId":"'"$PATIENT_C_ID"'",
+  "bloodType":"O+",
+  "hlaProfile":{"A":"A2","B":"B44","DR":"DR11"},
+  "urgencyLevel":2
+}'
+add_waiting_list "$PATIENT_C_PAYLOAD" "$PATIENT_C_ID (O+ HLA 1/3 urg 2 — queda en espera)"
 
 # --- 3. Compatibilidad HLA + assignment (1 bloque, 2 firmas) ---
 echo -e "${YELLOW}[4] compatibility/query (no escribe bloques)${NC}"
@@ -126,16 +153,24 @@ COMPAT_RESPONSE=$(curl -s -X POST "$DONANTE_URL/compatibility/query" \
   -H "Content-Type: application/json" \
   -d "{
     \"donorProfile\":{\"bloodType\":\"O+\",\"hlaProfile\":{\"A\":\"A2\",\"B\":\"B7\",\"DR\":\"DR5\"}},
-    \"waitingList\":[{\"patientId\":\"$PATIENT_ID\",\"bloodType\":\"O+\",\"hlaProfile\":{\"A\":\"A2\",\"B\":\"B7\",\"DR\":\"DR4\"},\"urgencyLevel\":3}]
+    \"waitingList\":[
+      {\"patientId\":\"$PATIENT_ID\",\"bloodType\":\"O+\",\"hlaProfile\":{\"A\":\"A2\",\"B\":\"B7\",\"DR\":\"DR4\"},\"urgencyLevel\":4},
+      {\"patientId\":\"$PATIENT_B_ID\",\"bloodType\":\"A+\",\"hlaProfile\":{\"A\":\"A1\",\"B\":\"B8\",\"DR\":\"DR3\"},\"urgencyLevel\":5},
+      {\"patientId\":\"$PATIENT_C_ID\",\"bloodType\":\"O+\",\"hlaProfile\":{\"A\":\"A2\",\"B\":\"B44\",\"DR\":\"DR11\"},\"urgencyLevel\":2}
+    ]
   }")
 
 COMPAT_TS=$(echo "$COMPAT_RESPONSE" | jq -r '.compatibilityTimestamp // empty')
-if [[ -z "$COMPAT_TS" ]]; then
-  echo -e "${RED}✗ Fallo /compatibility/query${NC}"
-  echo "$COMPAT_RESPONSE"
+CHOSEN=$(echo "$COMPAT_RESPONSE" | jq -r '.rankedCandidates[0].patientId // empty')
+HLA_SCORE=$(echo "$COMPAT_RESPONSE" | jq -r '.rankedCandidates[0].hlaScore // empty')
+if [[ -z "$COMPAT_TS" || "$CHOSEN" != "$PATIENT_ID" ]]; then
+  echo -e "${RED}✗ Fallo /compatibility/query (elegido='$CHOSEN', se esperaba $PATIENT_ID)${NC}"
+  echo "$COMPAT_RESPONSE" | jq . 2>/dev/null || echo "$COMPAT_RESPONSE"
   exit 1
 fi
-echo -e "${GREEN}✓ compatibilityTimestamp=$COMPAT_TS${NC}"
+echo -e "${GREEN}✓ Ranking:${NC}"
+echo "$COMPAT_RESPONSE" | jq -r '.rankedCandidates[] | "    \(.patientId)  HLA \(.hlaScore)  urgencia \(.urgencyLevel)"'
+echo -e "${GREEN}✓ Se asigna $CHOSEN (mejor HLA). compatibilityTimestamp=$COMPAT_TS${NC}"
 echo ""
 
 echo -e "${YELLOW}[5] assignment → 1 bloque (coordinador-nacional + hospital-donante)${NC}"
@@ -144,7 +179,8 @@ ASSIGNMENT_PAYLOAD='{
   "donorId":"'"$DONOR_ID"'",
   "recipientId":"'"$PATIENT_ID"'",
   "organ":"kidney",
-  "compatibilityTimestamp":"'"$COMPAT_TS"'"
+  "compatibilityTimestamp":"'"$COMPAT_TS"'",
+  "hlaScore":'"${HLA_SCORE:-66.66666666666666}"'
 }'
 
 COORD_ASSIGN_SIG=$(curl -s -X POST "$COORD_URL/sign" \
@@ -186,12 +222,12 @@ else
   exit 1
 fi
 
-MIN_CUSTODY=5
-echo -e "${YELLOW}[7] Esperando $MIN_CUSTODY lecturas de custodia (traslado en curso)...${NC}"
+MIN_CUSTODY=80
+echo -e "${YELLOW}[7] Esperando $MIN_CUSTODY lecturas (1 cada 5 s; envío comprimido)...${NC}"
 READINGS=0
-for _ in $(seq 1 30); do
+for _ in $(seq 1 80); do
   READINGS="$(curl -s -H "x-actor: coordinador-nacional" "$COORD_URL/dashboard/overview" | jq -r '.counts.custodyReadings // 0')"
-  echo "    lecturas en ledger: $READINGS"
+  echo "    lecturas en ledger: $READINGS / $MIN_CUSTODY"
   if [[ "$READINGS" =~ ^[0-9]+$ ]] && [[ "$READINGS" -ge "$MIN_CUSTODY" ]]; then
     break
   fi
@@ -251,7 +287,7 @@ echo -e "${BLUE}========================================${NC}"
 echo ""
 echo "Hechos en el ledger (replicados en los 4 nodos):"
 echo "  1. donor-registry   $DONOR_ID"
-echo "  2. waiting-list     $PATIENT_ID"
+echo "  2. waiting-list     $PATIENT_ID (asignado), $PATIENT_B_ID y $PATIENT_C_ID (en espera)"
 echo "  3. assignment       $DONOR_ID → $PATIENT_ID"
 echo "  4. custody          $READINGS lecturas (organId=$DONOR_ID)"
 echo "  5. reception        hospital-receptor (cierre de trazabilidad)"

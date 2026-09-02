@@ -6,7 +6,7 @@
 const path = require('path');
 const fs = require('fs');
 const { createAuthenticatedClient, getCertsDir } = require('../helpers/http');
-const crypto = require('crypto');
+const { testEntityId } = require('../helpers/fixtures');
 
 async function run() {
   const name = 'test10_telemetriaFirmada';
@@ -24,7 +24,7 @@ async function run() {
       sensorType: 'temperature',
       value: 2.5,
       unit: 'celsius',
-      organId: 'test-organ-' + crypto.randomBytes(4).toString('hex'),
+      organId: testEntityId(10, 'organ'),
     };
 
     // Obtener firma del hospital

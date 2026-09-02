@@ -1,7 +1,7 @@
-const { calculateHLAScore } = require("./hla-matching");
+const { calculateHLAScore, queryCompatible } = require("./hla-matching");
 
-const DEMO_DONOR_ID = "demo-pitch-donor-001";
-const DEMO_PATIENT_ID = "demo-pitch-patient-001";
+const DEMO_DONOR_ID = "demo-donor-001";
+const DEMO_PATIENT_ID = "demo-patient-001";
 const DEMO_SCRIPT = "bash scripts/setup-demo-pitch-data.sh";
 
 /**
@@ -408,13 +408,24 @@ function buildOverview(ledger) {
         organId: payload.organId,
         readings: 0,
         alertCount: 0,
+        samples: [],
       };
       prev.readings += 1;
       if (payload.fueraDeRango) prev.alertCount += 1;
       prev.deviceId = payload.deviceId || prev.deviceId;
+      prev.deviceActor = payload.deviceId ? `iot:${payload.deviceId}` : prev.deviceActor;
       prev.lastTimestamp = timestamp;
       prev.lastTempC = payload.temperaturaC ?? payload.value ?? prev.lastTempC;
       prev.organo = payload.organo || prev.organo;
+      prev.samples = prev.samples || [];
+      prev.samples.push({
+        secuencia: payload.secuencia ?? prev.samples.length + 1,
+        timestamp,
+        temperaturaC: payload.temperaturaC ?? payload.value ?? null,
+        humedadPct: payload.humedadPct ?? null,
+        fueraDeRango: Boolean(payload.fueraDeRango),
+        deviceId: payload.deviceId || prev.deviceId || null,
+      });
       custodyByOrgan.set(payload.organId, prev);
     }
   }
@@ -432,9 +443,12 @@ function buildOverview(ledger) {
     received: receivedDonorIds.has(d.donorId),
   }));
 
+  const assignedByPatient = new Map(assignments.map((a) => [a.recipientId, a.donorId]));
+
   const waitingList = [...patientsById.values()]
     .map((p) => ({
       ...p,
+      assignedDonorId: assignedByPatient.get(p.patientId) || null,
       status: receivedPatientIds.has(p.patientId)
         ? "recibido"
         : assignedPatientIds.has(p.patientId)
@@ -476,6 +490,29 @@ function buildOverview(ledger) {
     };
   });
 
+  const rankedDonor =
+    donors.find((d) => d.assigned && d.bloodType && d.hlaProfile) ||
+    donors.find((d) => d.bloodType && d.hlaProfile);
+  const matchRanking =
+    rankedDonor && waitingList.length
+      ? queryCompatible(
+          { bloodType: rankedDonor.bloodType, hlaProfile: rankedDonor.hlaProfile },
+          waitingList.map((p) => ({
+            patientId: p.patientId,
+            bloodType: p.bloodType,
+            hlaProfile: p.hlaProfile,
+            urgencyLevel: p.urgencyLevel,
+          }))
+        ).map((row) => ({
+          patientId: row.patientId,
+          bloodType: row.bloodType,
+          hlaProfile: row.hlaProfile,
+          urgencyLevel: row.urgencyLevel,
+          hlaScore: row.hlaScore,
+          selected: Boolean(assignedPatientIds.has(row.patientId)),
+        }))
+      : [];
+
   const fromDemoScript = donorsById.has(DEMO_DONOR_ID) && patientsById.has(DEMO_PATIENT_ID);
 
   return {
@@ -483,6 +520,7 @@ function buildOverview(ledger) {
     waitingList,
     assignments: assignmentViews,
     custody: [...custodyByOrgan.values()],
+    matchRanking,
     counts: {
       donors: donors.length,
       waiting: waitingList.length,

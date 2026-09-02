@@ -57,16 +57,27 @@ export function TelemetryChart({
     )
   }
 
-  // Prepare data for charts (add index for readability)
-  const chartData = data.map((reading, index) => ({
+  // Prepare data for charts (add index for readability).
+  // 1440 puntos traban el SVG; se muestrea el trazado y se conservan las alertas.
+  const mapped = data.map((reading, index) => ({
     ...reading,
     index: index + 1,
     timestamp: new Date(reading.timestamp).toLocaleTimeString(),
   }))
+  const maxChartPoints = 180
+  const chartData =
+    mapped.length <= maxChartPoints
+      ? mapped
+      : mapped.filter((row, i) => {
+          const step = Math.ceil(mapped.length / maxChartPoints)
+          return i % step === 0 || row.fueraDeRango || i === mapped.length - 1
+        })
 
   // Calculate statistics using shared helper
   const stats = calculateTelemetryStats(data)
   const alerts = getAlertReadings(data)
+  const deviceId = data[0]?.deviceId
+  const deviceActor = deviceId ? `iot:${deviceId}` : null
 
   if (!stats) {
     return (
@@ -191,6 +202,8 @@ export function TelemetryChart({
                 dataKey="index"
                 stroke="#64748b"
                 style={{ fontSize: '0.875rem' }}
+                interval="preserveStartEnd"
+                tickCount={8}
               />
               <YAxis
                 stroke="#64748b"
@@ -246,6 +259,8 @@ export function TelemetryChart({
                 dataKey="index"
                 stroke="#64748b"
                 style={{ fontSize: '0.875rem' }}
+                interval="preserveStartEnd"
+                tickCount={8}
               />
               <YAxis
                 stroke="#64748b"
@@ -276,11 +291,60 @@ export function TelemetryChart({
                 strokeWidth={2}
                 name="Humedad"
                 isAnimationActive={false}
-                dot={{ fill: '#10b981', r: 4 }}
+                dot={data.length > 40 ? false : { fill: '#10b981', r: 4 }}
                 activeDot={{ r: 6 }}
               />
             </LineChart>
           </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Lecturas</CardTitle>
+          <CardDescription>
+            {deviceId
+              ? `Contenedor ${deviceId} · identidad X.509 ${deviceActor}`
+              : 'Cada fila es un bloque custody en el ledger'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="overflow-x-auto">
+          {data.length > 80 && (
+            <p className="text-sm text-muted-foreground mb-3">
+              {data.length} lecturas en el ledger. Tabla: inicio, alerta y final.
+            </p>
+          )}
+          <table className="w-full text-base">
+            <thead className="text-xs uppercase tracking-wide text-muted-foreground">
+              <tr>
+                <th className="text-left font-medium py-2 pr-3">#</th>
+                <th className="text-left font-medium py-2 pr-3">Hora</th>
+                <th className="text-left font-medium py-2 pr-3">Temp.</th>
+                <th className="text-left font-medium py-2 pr-3">Humedad</th>
+                <th className="text-left font-medium py-2">Alerta</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(data.length <= 80
+                ? data
+                : [
+                    ...data.slice(0, 2),
+                    ...data.filter((r) => r.fueraDeRango),
+                    ...data.slice(-8),
+                  ].filter((r, i, arr) => arr.findIndex((x) => x.secuencia === r.secuencia && x.timestamp === r.timestamp) === i)
+              ).map((row, i) => (
+                <tr key={`${row.secuencia}-${row.timestamp}`} className="border-t">
+                  <td className="py-2 pr-3 tabular-nums">{row.secuencia || i + 1}</td>
+                  <td className="py-2 pr-3 text-sm">{new Date(row.timestamp).toLocaleString('es-AR')}</td>
+                  <td className={`py-2 pr-3 font-medium ${row.fueraDeRango ? 'text-red-700' : ''}`}>
+                    {formatTemp(row.temperaturaC)}
+                  </td>
+                  <td className="py-2 pr-3">{formatHumidity(row.humedadPct)}</td>
+                  <td className="py-2">{row.fueraDeRango ? 'Fuera de rango' : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </CardContent>
       </Card>
 

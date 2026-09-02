@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { useRole } from '@/lib/role-context'
 import { caseFocusForRole } from '@/lib/roles'
 import { getReadClient } from '@/lib/read-client'
@@ -28,6 +28,7 @@ function rememberCase(id: string) {
 
 export default function CasePage() {
   const params = useParams()
+  const router = useRouter()
   const caseId = decodeURIComponent(String(params.id ?? ''))
   const { role } = useRole()
   const focus = caseFocusForRole(role)
@@ -53,7 +54,14 @@ export default function CasePage() {
         }
         setError(null)
         setData(res)
-        rememberCase(caseId)
+        const donorId = res.state?.assignmentInfo?.donorId
+        const patientId = res.state?.recipientInfo?.patientId
+        if (donorId && caseId === patientId && donorId !== caseId) {
+          rememberCase(donorId)
+          router.replace(`/dashboard/casos/${encodeURIComponent(donorId)}`)
+          return
+        }
+        rememberCase(donorId || caseId)
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err))
       } finally {
@@ -85,11 +93,17 @@ export default function CasePage() {
         </Link>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <h1 className="text-3xl font-semibold tracking-tight">{organLabel(organ) !== '—' ? organLabel(organ) : caseId}</h1>
-          {received && <StatusPill tone="success">Recibido</StatusPill>}
+          {received && <StatusPill tone="success">Recibido en hospital</StatusPill>}
           {assigned && !received && <StatusPill tone="success">Asignado</StatusPill>}
           {inTransit && !received && <StatusPill tone="info">En traslado</StatusPill>}
         </div>
-        <p className="text-base text-muted-foreground mt-1">{caseId}</p>
+        <p className="text-base text-muted-foreground mt-1">
+          {data?.state?.assignmentInfo
+            ? `${data.state.assignmentInfo.donorId} → ${data.state.assignmentInfo.recipientId}`
+            : data?.state?.recipientInfo
+              ? `Candidato ${data.state.recipientInfo.patientId}`
+              : caseId}
+        </p>
       </div>
 
       {loading && <p className="text-base text-muted-foreground">Cargando ficha…</p>}

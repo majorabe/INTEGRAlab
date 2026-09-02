@@ -41,7 +41,8 @@ function skipIfNoDocker(testName) {
       : `${testName} saltado: Docker no está instalado en el sistema`;
 
     return {
-      passed: true, // Consideramos skip como "passed" para no romper la suite
+      name: testName,
+      passed: true,
       detail,
       skipped: true,
     };

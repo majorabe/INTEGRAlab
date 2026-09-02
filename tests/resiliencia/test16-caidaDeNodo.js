@@ -6,9 +6,8 @@
 
 const { createAuthenticatedClient } = require('../helpers/http');
 const { spawn } = require('child_process');
-const { donorPayload } = require('../helpers/fixtures');
+const { donorPayload, testEntityId } = require('../helpers/fixtures');
 const { skipIfNoDocker } = require('../helpers/docker-detect');
-const crypto = require('crypto');
 
 /**
  * Ejecuta comando Docker Compose de forma async
@@ -57,7 +56,7 @@ async function run() {
     const client = createAuthenticatedClient('hospital-donante');
 
     // [1] Registrar donante (baseline)
-    const payload1 = { ...donorPayload, donorId: 'donor-pre-' + crypto.randomBytes(4).toString('hex') };
+    const payload1 = { ...donorPayload, donorId: testEntityId(16, 'donor', 'pre') };
 
     // Obtener firma
     const sig1Response = await client.post('/sign', { payload: payload1 });
@@ -99,7 +98,7 @@ async function run() {
     }
 
     // [3] Intentar registrar nuevo donante (debe fallar en nodo caído, pero otros deben responder)
-    const payload2 = { ...donorPayload, donorId: 'donor-durante-' + crypto.randomBytes(4).toString('hex') };
+    const payload2 = { ...donorPayload, donorId: testEntityId(16, 'donor', 'durante') };
     const tx2 = await client.post('/tx/donor-registry', payload2);
 
     // No esperamos éxito aquí (el nodo específico puede fallar)

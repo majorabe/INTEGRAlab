@@ -86,7 +86,9 @@ services:
 
   # No arranca con `docker compose up`. La telemetría es trazabilidad del
   # órgano: solo después de un assignment. Activar:
-  #   ORGAN_ID=demo-pitch-donor-001 docker compose --profile iot up -d iot-simulator
+  #   ORGAN_ID=demo-donor-001 docker compose --profile iot up -d iot-simulator
+  # Cadencia real del sensor: 5 s. 80 lecturas (~6 min 40 s de viaje).
+  # INTERVALO_MS comprime el envío (no se espera el reloj del viaje).
   iot-simulator:
     build: ./iot-simulator
     profiles: ["iot"]
@@ -94,11 +96,13 @@ services:
       - DEVICE_ID=sensor-contenedor-001
       - CERTS_DIR=/certs
       - CUSTODY_NODE_URL=http://hospital-donante:3000
-      - INTERVALO_MS=5000
+      - INTERVALO_MS=80
       - ORGANO=rinon
       - SIMULAR_FALLA_TEMP=true
-      - LECTURAS_MAX=8
-      - ORGAN_ID=${ORGAN_ID:-demo-pitch-donor-001}
+      - CADENCIA_REAL_MS=5000
+      - VIAJE_MS=400000
+      - LECTURAS_MAX=80
+      - ORGAN_ID=${ORGAN_ID:-demo-donor-001}
       - HEALTH_PORT=3010
     ports:
       - "3010:3010"

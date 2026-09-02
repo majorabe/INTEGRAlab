@@ -6,7 +6,7 @@
 
 const { createCustomClient } = require('../helpers/http');
 const { generateExpiredCert } = require('../helpers/certs');
-const { donorPayload } = require('../helpers/fixtures');
+const { makeDonor } = require('../helpers/fixtures');
 
 async function run() {
   const name = 'test03_certExpirado';
@@ -17,7 +17,7 @@ async function run() {
     const client = createCustomClient('hospital-donante', cert, key);
 
     // Intentar enviar transacción con cert expirado
-    const response = await client.post('/tx/donor-registry', donorPayload);
+    const response = await client.post('/tx/donor-registry', makeDonor(3));
 
     // Debe ser rechazado
     if (response.status >= 400 || (response.data && !response.data.ok)) {

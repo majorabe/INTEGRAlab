@@ -4,7 +4,7 @@
  */
 
 const { createClient } = require('../helpers/http');
-const { donorPayload } = require('../helpers/fixtures');
+const { makeDonor } = require('../helpers/fixtures');
 
 async function run() {
   const name = 'test06_donorRegistrySinFirma';
@@ -14,7 +14,7 @@ async function run() {
     const client = createClient('hospital-donante');
 
     // Intentar enviar sin firma
-    const response = await client.post('/tx/donor-registry', donorPayload);
+    const response = await client.post('/tx/donor-registry', makeDonor(6));
 
     // Debe ser rechazado
     if (response.status >= 400 || (response.data && !response.data.ok)) {

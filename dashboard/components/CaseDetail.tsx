@@ -11,7 +11,7 @@ interface CaseDetailProps {
   focus?: CaseFocus
 }
 
-export function CaseDetail({ caseState, focus = 'full' }: CaseDetailProps) {
+export function CaseDetail({ caseState, telemetry = [], focus = 'full' }: CaseDetailProps) {
   const showDonor = focus === 'full' || focus === 'donor'
   const showRecipient = focus === 'full'
   const showAssignment = focus !== 'telemetry'
@@ -87,6 +87,19 @@ export function CaseDetail({ caseState, focus = 'full' }: CaseDetailProps) {
               label="Recibido"
               value={new Date(caseState.receptionInfo.receivedAt).toLocaleString('es-AR')}
             />
+          </dl>
+        </SectionCard>
+      )}
+
+      {telemetry.length > 0 && (
+        <SectionCard title="Contenedor">
+          <dl className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <Field label="Dispositivo" value={telemetry[0].deviceId || '—'} />
+            <Field
+              label="Identidad PKI"
+              value={telemetry[0].deviceId ? `iot:${telemetry[0].deviceId}` : '—'}
+            />
+            <Field label="Lecturas" value={String(telemetry.length)} />
           </dl>
         </SectionCard>
       )}

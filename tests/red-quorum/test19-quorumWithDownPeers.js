@@ -10,9 +10,8 @@
 
 const axios = require('axios');
 const { createAuthenticatedClient, NODES } = require('../helpers/http');
-const { waitingListEntry } = require('../helpers/fixtures');
+const { waitingListEntry, testEntityId } = require('../helpers/fixtures');
 const { skipIfNoDocker } = require('../helpers/docker-detect');
-const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
@@ -91,7 +90,7 @@ async function run() {
     // PASO 2: Preparar transacción válida (con firmas correctas de 2 orgs)
     const payload = {
       ...waitingListEntry,
-      patientId: 'test-quorum-' + crypto.randomBytes(4).toString('hex'),
+      patientId: testEntityId(19, 'patient'),
     };
 
     // Obtener firmas válidas (desde nodos que SIGUEN ACTIVOS)

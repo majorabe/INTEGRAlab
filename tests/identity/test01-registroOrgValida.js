@@ -5,7 +5,7 @@
  */
 
 const { createAuthenticatedClient } = require('../helpers/http');
-const { donorPayload } = require('../helpers/fixtures');
+const { makeDonor } = require('../helpers/fixtures');
 
 async function run() {
   const name = 'test01_registroOrgValida';
@@ -14,7 +14,7 @@ async function run() {
     const client = createAuthenticatedClient('hospital-donante');
 
     // Preparar payload
-    const payload = { ...donorPayload };
+    const payload = makeDonor(1);
 
     // Obtener firma
     const signResponse = await client.post('/sign', { payload });

@@ -5,7 +5,7 @@
  */
 
 const { createAuthenticatedClient } = require('../helpers/http');
-const crypto = require('crypto');
+const { makeDonor, makePatient } = require('../helpers/fixtures');
 
 async function run() {
   const name = 'test18_auditoriaFirmasE2E';
@@ -15,13 +15,7 @@ async function run() {
     const hospClient = createAuthenticatedClient('hospital-donante');
 
     // [1] Registrar donante
-    const donorPayload = {
-      donorId: 'donor-audit-' + crypto.randomBytes(4).toString('hex'),
-      bloodType: 'O+',
-      hlaProfile: { A: 'A2', B: 'B7', DR: 'DR4' },
-      organType: 'kidney',
-      preservationMethod: 'static-cold',
-    };
+    const donorPayload = makeDonor(18);
 
     // Obtener firma para donante
     const donorSigResponse = await hospClient.post('/sign', { payload: donorPayload });
@@ -50,12 +44,7 @@ async function run() {
     }
 
     // [2] Registrar candidato en lista de espera con doble firma
-    const patientPayload = {
-      patientId: 'patient-audit-' + crypto.randomBytes(4).toString('hex'),
-      bloodType: 'O+',
-      hlaProfile: { A: 'A2', B: 'B7', DR: 'DR4' },
-      urgencyLevel: 3,
-    };
+    const patientPayload = makePatient(18);
 
     const signPayload = { payload: patientPayload };
     const coordSig = await coordClient.post('/sign', signPayload);

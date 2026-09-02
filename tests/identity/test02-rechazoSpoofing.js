@@ -5,7 +5,7 @@
 
 const { createCustomClient } = require('../helpers/http');
 const { generateSelfSignedCert } = require('../helpers/certs');
-const { donorPayload } = require('../helpers/fixtures');
+const { makeDonor } = require('../helpers/fixtures');
 
 async function run() {
   const name = 'test02_rechazoSpoofing';
@@ -16,7 +16,7 @@ async function run() {
     const client = createCustomClient('hospital-donante', cert, key);
 
     // Intentar enviar transacción con cert spoofed
-    const response = await client.post('/tx/donor-registry', donorPayload);
+    const response = await client.post('/tx/donor-registry', makeDonor(2));
 
     // Debe ser rechazado (status 401/403 o ok:false)
     if (response.status >= 400 || (response.data && !response.data.ok)) {

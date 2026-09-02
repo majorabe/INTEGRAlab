@@ -3,10 +3,12 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import { Activity, Server } from 'lucide-react'
 import { useRole } from '@/lib/role-context'
-import { ROLE_CONFIGS, getAvailableRoles, NODE_URLS } from '@/lib/roles'
+import { ROLE_CONFIGS, getAvailableRoles } from '@/lib/roles'
 import { getReadClient } from '@/lib/read-client'
 import { NodeHealth, RoleType } from '@/lib/types'
+import { StatusPill } from '@/components/StatusPill'
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const { role, setRole } = useRole()
@@ -38,19 +40,22 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   }, [role])
 
   const nav = [
-    { href: '/dashboard', label: 'Inicio' },
+    { href: '/dashboard', label: 'Tablero' },
     { href: '/dashboard/casos', label: 'Consultar caso' },
     { href: '/dashboard/estadisticas', label: 'Estadísticas' },
   ]
 
+  const replicaOk = Boolean(health && health.status === 'ok' && !healthError)
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="border-b bg-card">
-        <div className="mx-auto max-w-6xl px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-6">
+        <div className={`h-1.5 ${config.color}`} aria-hidden />
+        <div className="mx-auto max-w-6xl px-4 py-4 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-8">
             <div>
-              <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">INTEGRA · consulta</p>
-              <p className="text-sm font-semibold">Dashboard clínico</p>
+              <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">INTEGRA · consulta clínica</p>
+              <p className="text-lg font-semibold leading-tight">Donantes y traslados</p>
             </div>
             <nav className="flex gap-1">
               {nav.map((item) => {
@@ -62,7 +67,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`rounded-md px-3 py-1.5 text-sm ${
+                    className={`rounded-md px-3 py-2 text-base ${
                       active
                         ? 'bg-primary text-primary-foreground'
                         : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
@@ -76,12 +81,13 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-3">
-            <label className="text-xs text-muted-foreground">
-              Leer réplica
+            <label className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span className="whitespace-nowrap">Organización</span>
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value as RoleType)}
-                className="ml-2 h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground"
+                aria-label="Organización desde la que se consulta"
+                className="h-10 min-w-[13rem] rounded-md border border-input bg-background px-2 text-base text-foreground"
               >
                 {getAvailableRoles().map((id) => (
                   <option key={id} value={id}>
@@ -90,33 +96,36 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 ))}
               </select>
             </label>
+            <span
+              className={`h-2.5 w-2.5 rounded-full ${replicaOk ? 'bg-teal-600' : 'bg-red-500'}`}
+              title={replicaOk ? 'Réplica en línea' : 'Réplica sin respuesta'}
+              aria-label={replicaOk ? 'Réplica en línea' : 'Réplica sin respuesta'}
+            />
             <Link
               href="/infra"
-              className="text-xs text-muted-foreground hover:text-foreground underline-offset-4 hover:underline"
+              className="inline-flex items-center gap-1.5 rounded-md border border-input px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              title="Salud de los nodos y consistencia del ledger"
             >
-              Infra
+              <Server className="h-4 w-4" />
+              Red
             </Link>
           </div>
         </div>
-        <div className="mx-auto max-w-6xl px-4 pb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-          <span>{config.description}</span>
-          <span className="font-mono">{NODE_URLS[role].replace('http://', '')}</span>
-          {health && (
-            <span className="font-tabular">
-              {health.org} · {health.ledgerBlocks} bloques · {health.status}
-            </span>
+        <div className="mx-auto max-w-6xl px-4 pb-4 flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <Activity className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <p className="text-sm">
+              <span className="font-semibold">{config.name}</span>
+              <span className="text-muted-foreground"> · {config.description}</span>
+            </p>
+          </div>
+          {healthError ? (
+            <Link href="/infra" className="text-sm text-destructive underline-offset-2 hover:underline">
+              Esta organización no responde
+            </Link>
+          ) : (
+            <StatusPill tone="neutral">Solo lectura</StatusPill>
           )}
-          {healthError && (
-            <span className="text-destructive">
-              Nodo no responde.{' '}
-              <Link href="/infra" className="underline">
-                Ver infra
-              </Link>
-            </span>
-          )}
-          <span className="ml-auto rounded-full bg-accent px-2 py-0.5 text-accent-foreground">
-            solo lectura
-          </span>
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-4 py-8">{children}</main>

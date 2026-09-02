@@ -247,6 +247,25 @@ for tx in data['recentTransactions'][-3:]:
 "
 echo ""
 
+echo "[TEST 5] GET /dashboard/overview"
+echo "Testing clinical board projection..."
+OVERVIEW_RESULT=$(curl -s -X GET "$COORDINADOR_URL/dashboard/overview" \
+  -H "x-actor: coordinador-nacional")
+
+OVERVIEW_OK=$(echo "$OVERVIEW_RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('ok', False))")
+DONOR_COUNT=$(echo "$OVERVIEW_RESULT" | python3 -c "import sys,json; print(len(json.load(sys.stdin).get('donors', [])))")
+WAIT_COUNT=$(echo "$OVERVIEW_RESULT" | python3 -c "import sys,json; print(len(json.load(sys.stdin).get('waitingList', [])))")
+ASSIGN_COUNT=$(echo "$OVERVIEW_RESULT" | python3 -c "import sys,json; print(len(json.load(sys.stdin).get('assignments', [])))")
+if [ "$OVERVIEW_OK" = "True" ] && [ "$DONOR_COUNT" -ge 1 ] && [ "$WAIT_COUNT" -ge 1 ] && [ "$ASSIGN_COUNT" -ge 1 ]; then
+  echo "✓ Overview retrieved"
+  echo "  Donors: $DONOR_COUNT  waiting: $WAIT_COUNT  assignments: $ASSIGN_COUNT"
+else
+  echo "✗ Overview missing donors/waiting-list/assignment"
+  echo "$OVERVIEW_RESULT"
+  exit 1
+fi
+echo ""
+
 echo "=========================================="
 echo "✓ All Dashboard Tests Passed"
 echo "=========================================="
@@ -261,4 +280,5 @@ echo "    ✓ GET /dashboard/casos/:id (consolidated case state)"
 echo "    ✓ GET /dashboard/casos/:id/timeline (event feed)"
 echo "    ✓ GET /dashboard/casos/:id/telemetria (telemetry series)"
 echo "    ✓ GET /dashboard/health (node health)"
+echo "    ✓ GET /dashboard/overview (donors, waiting list, assignments)"
 echo ""

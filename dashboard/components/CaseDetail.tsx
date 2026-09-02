@@ -2,7 +2,7 @@
 
 import { CaseState, TelemetryReading } from '@/lib/types'
 import { CaseFocus } from '@/lib/roles'
-import { calculateTelemetryStats, formatHumidity, formatTemp } from '@/lib/telemetry-utils'
+import { organLabel, preservationLabel } from '@/lib/ui-labels'
 import { Field, SectionCard } from './Field'
 
 interface CaseDetailProps {
@@ -11,34 +11,24 @@ interface CaseDetailProps {
   focus?: CaseFocus
 }
 
-export function CaseDetail({ caseState, telemetry = [], focus = 'full' }: CaseDetailProps) {
-  const stats = calculateTelemetryStats(telemetry)
+export function CaseDetail({ caseState, focus = 'full' }: CaseDetailProps) {
   const showDonor = focus === 'full' || focus === 'donor'
   const showRecipient = focus === 'full'
   const showAssignment = focus !== 'telemetry'
-  const showCustody = focus === 'full' || focus === 'custody' || focus === 'telemetry'
-  const showTx = focus === 'full' || focus === 'donor'
 
   return (
     <div className="space-y-4">
       {showDonor && (
-        <SectionCard
-          title="Donante"
-          hint="Proyección de transacciones donor-registry"
-          empty={!caseState.donorInfo ? 'Aún no hay bloque donor-registry para este ID' : undefined}
-        >
+        <SectionCard title="Donante" empty={!caseState.donorInfo ? 'Este caso aún no tiene donante.' : undefined}>
           {caseState.donorInfo && (
             <dl className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <Field label="ID" value={caseState.donorInfo.donorId} mono />
+              <Field label="Identificador" value={caseState.donorInfo.donorId} />
               <Field label="Sangre" value={caseState.donorInfo.bloodType} />
-              <Field label="Órgano" value={caseState.donorInfo.organType} />
-              <Field label="HLA-A" value={caseState.donorInfo.hlaProfile.A} mono />
-              <Field label="HLA-B" value={caseState.donorInfo.hlaProfile.B} mono />
-              <Field label="HLA-DR" value={caseState.donorInfo.hlaProfile.DR} mono />
-              <Field
-                label="Preservación"
-                value={caseState.donorInfo.preservationMethod.replace(/-/g, ' ')}
-              />
+              <Field label="Órgano" value={organLabel(caseState.donorInfo.organType)} />
+              <Field label="HLA-A" value={caseState.donorInfo.hlaProfile.A} />
+              <Field label="HLA-B" value={caseState.donorInfo.hlaProfile.B} />
+              <Field label="HLA-DR" value={caseState.donorInfo.hlaProfile.DR} />
+              <Field label="Preservación" value={preservationLabel(caseState.donorInfo.preservationMethod)} />
               <Field
                 label="Registrado"
                 value={new Date(caseState.donorInfo.registeredAt).toLocaleString('es-AR')}
@@ -51,17 +41,16 @@ export function CaseDetail({ caseState, telemetry = [], focus = 'full' }: CaseDe
       {showRecipient && (
         <SectionCard
           title="Receptor"
-          hint="Proyección de waiting-list"
-          empty={!caseState.recipientInfo ? 'Aún no hay bloque waiting-list vinculado' : undefined}
+          empty={!caseState.recipientInfo ? 'Todavía no hay un paciente vinculado.' : undefined}
         >
           {caseState.recipientInfo && (
             <dl className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <Field label="ID" value={caseState.recipientInfo.patientId} mono />
+              <Field label="Identificador" value={caseState.recipientInfo.patientId} />
               <Field label="Sangre" value={caseState.recipientInfo.bloodType} />
               <Field label="Urgencia" value={`${caseState.recipientInfo.urgencyLevel}/5`} />
-              <Field label="HLA-A" value={caseState.recipientInfo.hlaProfile.A} mono />
-              <Field label="HLA-B" value={caseState.recipientInfo.hlaProfile.B} mono />
-              <Field label="HLA-DR" value={caseState.recipientInfo.hlaProfile.DR} mono />
+              <Field label="HLA-A" value={caseState.recipientInfo.hlaProfile.A} />
+              <Field label="HLA-B" value={caseState.recipientInfo.hlaProfile.B} />
+              <Field label="HLA-DR" value={caseState.recipientInfo.hlaProfile.DR} />
               <Field
                 label="En lista desde"
                 value={new Date(caseState.recipientInfo.addedToWaitingListAt).toLocaleString('es-AR')}
@@ -74,16 +63,12 @@ export function CaseDetail({ caseState, telemetry = [], focus = 'full' }: CaseDe
       {showAssignment && (
         <SectionCard
           title="Asignación"
-          hint="Proyección de assignment (endorsement ya validado en el nodo)"
-          empty={!caseState.assignmentInfo ? 'Aún no hay assignment: el traslado no empezó, el IoT no debe escribir' : undefined}
+          empty={!caseState.assignmentInfo ? 'El órgano aún no fue asignado.' : undefined}
         >
           {caseState.assignmentInfo && (
             <dl className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <Field label="Donante" value={caseState.assignmentInfo.donorId} mono />
-              <Field label="Receptor" value={caseState.assignmentInfo.recipientId} mono />
-              <Field label="Órgano" value={caseState.assignmentInfo.organ} />
               {caseState.assignmentInfo.hlaScore !== undefined && (
-                <Field label="Score HLA" value={caseState.assignmentInfo.hlaScore.toFixed(2)} />
+                <Field label="Compatibilidad HLA" value={`${Math.round(caseState.assignmentInfo.hlaScore)} / 100`} />
               )}
               <Field
                 label="Asignado"
@@ -94,55 +79,13 @@ export function CaseDetail({ caseState, telemetry = [], focus = 'full' }: CaseDe
         </SectionCard>
       )}
 
-      {showCustody && (
-        <SectionCard
-          title="Custodia"
-          hint="Estadísticas derivadas de lecturas custody ya grabadas"
-          empty={!stats ? 'Aún no hay custody con organId de este caso (IoT no iniciado o esperando assignment)' : undefined}
-        >
-          {stats && (
-            <div className="space-y-4">
-              <dl className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="rounded-md border bg-muted/60 p-3">
-                  <Field label="Temp. mín" value={formatTemp(stats.minTemp)} />
-                </div>
-                <div className="rounded-md border bg-muted/60 p-3">
-                  <Field label="Temp. máx" value={formatTemp(stats.maxTemp)} />
-                </div>
-                <div className="rounded-md border bg-muted/60 p-3">
-                  <Field label="Temp. prom" value={formatTemp(parseFloat(stats.avgTemp))} />
-                </div>
-                <div className="rounded-md border bg-muted/60 p-3">
-                  <Field label="Humedad prom" value={formatHumidity(parseFloat(stats.avgHumidity))} />
-                </div>
-              </dl>
-              <dl className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <Field label="Lecturas" value={String(stats.totalReadings)} />
-                <Field label="Fuera de rango" value={String(stats.alertCount)} />
-                <Field
-                  label="Cadena de frío"
-                  value={stats.alertCount === 0 ? 'Dentro de rango' : 'Hay lecturas fuera de rango'}
-                />
-              </dl>
-              {stats.alertCount > 0 && (
-                <p className="text-sm text-destructive">
-                  {stats.alertCount} lectura(s) con temperatura fuera de 0–4 °C (riñón). Dato del ledger, no estimado.
-                </p>
-              )}
-            </div>
-          )}
-        </SectionCard>
-      )}
-
-      {showTx && (
-        <SectionCard title="Actividad en ledger" hint="Conteo de bloques que afectan este caso">
-          <dl className="grid grid-cols-2 gap-4">
-            <Field label="Transacciones" value={String(caseState.transactionCount)} />
+      {showAssignment && caseState.receptionInfo && (
+        <SectionCard title="Recepción">
+          <dl className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <Field label="Hospital" value="Hospital receptor" />
             <Field
-              label="Último evento"
-              value={
-                caseState.lastUpdated ? new Date(caseState.lastUpdated).toLocaleString('es-AR') : undefined
-              }
+              label="Recibido"
+              value={new Date(caseState.receptionInfo.receivedAt).toLocaleString('es-AR')}
             />
           </dl>
         </SectionCard>

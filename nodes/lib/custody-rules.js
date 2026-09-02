@@ -29,6 +29,21 @@ function assertCustodyBusinessRules(payload, blocks) {
     };
   }
 
+  const received = (blocks || []).some((b) => {
+    if (b.txType !== "reception" || !b.payload) return false;
+    const id = b.payload.donorId || b.payload.organId;
+    return id === organId;
+  });
+  if (received) {
+    return {
+      ok: false,
+      status: 409,
+      reason:
+        `El órgano ${organId} ya fue recibido en el hospital receptor. ` +
+        "El traslado está cerrado: no se aceptan más lecturas de custodia.",
+    };
+  }
+
   return { ok: true };
 }
 

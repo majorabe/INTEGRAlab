@@ -19,6 +19,20 @@ function normalizeHost(value: string): string {
   return v
 }
 
+/** 127/8, 10/8, 172.16/12, 192.168/16 — p.ej. gateway Docker 172.19.0.1 */
+function isLoopbackOrPrivateIpv4(host: string): boolean {
+  if (LOOPBACK.has(host)) return true
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host)
+  if (!m) return false
+  const a = Number(m[1])
+  const b = Number(m[2])
+  if (a === 127) return true
+  if (a === 10) return true
+  if (a === 192 && b === 168) return true
+  if (a === 172 && b >= 16 && b <= 31) return true
+  return false
+}
+
 /**
  * Rechaza cualquier request que no venga de loopback.
  * Este helper protege rutas que ejecutan comandos del sistema o sondean
@@ -47,14 +61,18 @@ export function rejectUnlessLocalhost(request: NextRequest): NextResponse | null
     )
   }
 
+  // El browser entra por localhost:3000; Docker pone el gateway del bridge
+  // (p.ej. ::ffff:172.19.0.1) en x-forwarded-for. Eso no es loopback, pero
+  // tampoco es un deploy público: Host ya se validó como localhost.
   const forwardedFor = request.headers.get('x-forwarded-for')
   if (forwardedFor) {
     const first = forwardedFor.split(',')[0].trim()
-    if (first && !LOOPBACK.has(normalizeHost(first))) {
+    const hop = first ? normalizeHost(first) : ''
+    if (hop && !isLoopbackOrPrivateIpv4(hop)) {
       return NextResponse.json(
         {
           ok: false,
-          error: `Rechazado: x-forwarded-for '${first}' no es una dirección loopback.`,
+          error: `Rechazado: x-forwarded-for '${first}' no es loopback ni red privada (Docker).`,
         },
         { status: 403 }
       )

@@ -5,7 +5,14 @@
  */
 
 import axios, { AxiosInstance } from 'axios'
-import { CaseResponse, NodeHealth, RoleType, TelemetryResponse, TimelineResponse } from './types'
+import {
+  CaseResponse,
+  LedgerOverview,
+  NodeHealth,
+  RoleType,
+  TelemetryResponse,
+  TimelineResponse,
+} from './types'
 import { NODE_URLS, actorHeaderForRole } from './roles'
 
 function throwReadError(error: unknown, context: string): never {
@@ -89,6 +96,15 @@ export class ReadClient {
       return response.data
     } catch (error) {
       throwReadError(error, 'No se pudo leer /dashboard/health de este nodo')
+    }
+  }
+
+  async getOverview(): Promise<LedgerOverview> {
+    try {
+      const response = await this.axiosInstance.get<LedgerOverview>('/dashboard/overview')
+      return response.data
+    } catch (error) {
+      throwReadError(error, 'No se pudo leer /dashboard/overview de este nodo')
     }
   }
 }

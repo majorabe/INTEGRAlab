@@ -42,18 +42,15 @@ export function TelemetryChart({
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 text-lg">
             <Thermometer className="h-5 w-5" />
             {title}
           </CardTitle>
           <CardDescription>{description}</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-center py-12 text-slate-500">
-            <p>
-              Todavía no hay lecturas custody con organId de este caso. Es normal hasta el assignment y el
-              arranque del IoT. El gráfico no inventa puntos.
-            </p>
+          <div className="flex items-center justify-center py-12 text-muted-foreground">
+            <p>Todavía no hay lecturas de temperatura en este traslado.</p>
           </div>
         </CardContent>
       </Card>
@@ -75,18 +72,15 @@ export function TelemetryChart({
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 text-lg">
             <Thermometer className="h-5 w-5" />
             {title}
           </CardTitle>
           <CardDescription>{description}</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-center py-12 text-slate-500">
-            <p>
-              Todavía no hay lecturas custody con organId de este caso. Es normal hasta el assignment y el
-              arranque del IoT. El gráfico no inventa puntos.
-            </p>
+          <div className="flex items-center justify-center py-12 text-muted-foreground">
+            <p>Todavía no hay lecturas de temperatura en este traslado.</p>
           </div>
         </CardContent>
       </Card>
@@ -171,7 +165,7 @@ export function TelemetryChart({
       {/* Temperature Chart */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 text-lg">
             <Thermometer className="h-5 w-5" />
             Temperatura Durante Transporte
           </CardTitle>
@@ -236,7 +230,7 @@ export function TelemetryChart({
       {/* Humidity Chart */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 text-lg">
             <Droplet className="h-5 w-5" />
             Humedad Durante Transporte
           </CardTitle>
@@ -290,71 +284,6 @@ export function TelemetryChart({
         </CardContent>
       </Card>
 
-      {/* Data Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Lecturas Detalladas ({chartData.length} registros)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-200">
-                  <th className="text-left py-2 px-3 font-semibold text-slate-600">#</th>
-                  <th className="text-left py-2 px-3 font-semibold text-slate-600">
-                    Timestamp
-                  </th>
-                  <th className="text-right py-2 px-3 font-semibold text-slate-600">
-                    Temp (°C)
-                  </th>
-                  <th className="text-right py-2 px-3 font-semibold text-slate-600">
-                    Humedad (%)
-                  </th>
-                  <th className="text-center py-2 px-3 font-semibold text-slate-600">
-                    Alerta
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {chartData.slice(-10).map((row, idx) => (
-                  <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50">
-                    <td className="py-2 px-3 text-slate-600">{row.index}</td>
-                    <td className="py-2 px-3 text-slate-600 font-mono text-xs">
-                      {row.timestamp}
-                    </td>
-                    <td
-                      className={`py-2 px-3 text-right font-semibold ${
-                        row.fueraDeRango ? 'text-red-600' : 'text-green-600'
-                      }`}
-                    >
-                      {formatTemp(row.temperaturaC, 2)}
-                    </td>
-                    <td className="py-2 px-3 text-right text-slate-600">
-                      {formatHumidity(row.humedadPct)}
-                    </td>
-                    <td className="py-2 px-3 text-center">
-                      {row.fueraDeRango ? (
-                        <span className="inline-block px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-semibold">
-                          Sí
-                        </span>
-                      ) : (
-                        <span className="inline-block px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-semibold">
-                          No
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {chartData.length > 10 && (
-            <p className="text-xs text-slate-500 mt-4">
-              Mostrando últimas 10 de {chartData.length} lecturas
-            </p>
-          )}
-        </CardContent>
-      </Card>
     </div>
   )
 }

@@ -1,3 +1,9 @@
+const { calculateHLAScore } = require("./hla-matching");
+
+const DEMO_DONOR_ID = "demo-pitch-donor-001";
+const DEMO_PATIENT_ID = "demo-pitch-patient-001";
+const DEMO_SCRIPT = "bash scripts/setup-demo-pitch-data.sh";
+
 /**
  * Dashboard Projection Layer
  *
@@ -60,6 +66,7 @@ function buildCaseState(transactions) {
     donorInfo: null,
     recipientInfo: null,
     assignmentInfo: null,
+    receptionInfo: null,
     custodyCheckpoints: [],
     transactionCount: transactions.length,
     lastUpdated: null,
@@ -110,6 +117,16 @@ function buildCaseState(transactions) {
           unit: payload.unit || 'celsius',
           deviceId: payload.deviceId,
         });
+        state.lastUpdated = timestamp;
+        break;
+
+      case 'reception':
+        state.receptionInfo = {
+          donorId: payload.donorId || payload.organId,
+          recipientId: payload.recipientId || payload.patientId || null,
+          hospital: payload.hospital || 'hospital-receptor',
+          receivedAt: timestamp,
+        };
         state.lastUpdated = timestamp;
         break;
     }
@@ -164,12 +181,22 @@ function buildTimeline(transactions) {
         break;
 
       case 'custody':
-        action = `Telemetry recorded: ${payload.sensorType}=${payload.value}${payload.unit}`;
+        action =
+          payload.temperaturaC != null
+            ? `Lectura de temperatura: ${payload.temperaturaC} °C`
+            : `Telemetry recorded: ${payload.sensorType}=${payload.value}${payload.unit}`;
         payloadSummary = {
           deviceId: payload.deviceId,
-          sensorType: payload.sensorType,
-          value: payload.value,
-          unit: payload.unit,
+          temperaturaC: payload.temperaturaC,
+        };
+        break;
+
+      case 'reception':
+        action = `Órgano recibido en hospital receptor: ${payload.donorId || payload.organId}`;
+        payloadSummary = {
+          donorId: payload.donorId || payload.organId,
+          recipientId: payload.recipientId,
+          hospital: payload.hospital || 'hospital-receptor',
         };
         break;
     }
@@ -232,10 +259,36 @@ function extractTelemetrySeries(transactions) {
 }
 
 /**
+ * Si el caso se consultó por donorId, también trae el waiting-list del receptor
+ * (y viceversa) para que la ficha muestre sangre/HLA de ambos.
+ */
+function expandRelatedTransactions(ledger, caseId) {
+  const seed = extractCaseTransactions(ledger, caseId);
+  const ids = new Set([caseId]);
+  for (const t of seed) {
+    if (t.payload.donorId) ids.add(t.payload.donorId);
+    if (t.payload.patientId) ids.add(t.payload.patientId);
+    if (t.payload.recipientId) ids.add(t.payload.recipientId);
+    if (t.payload.organId) ids.add(t.payload.organId);
+  }
+  const seen = new Set();
+  const expanded = [];
+  for (const id of ids) {
+    for (const t of extractCaseTransactions(ledger, id)) {
+      const key = t.hash || `${t.timestamp}:${t.txType}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      expanded.push(t);
+    }
+  }
+  return expanded;
+}
+
+/**
  * Query case by ID (donorId or patientId/recipientId)
  */
 function queryCase(ledger, caseId) {
-  const transactions = extractCaseTransactions(ledger, caseId);
+  const transactions = expandRelatedTransactions(ledger, caseId);
 
   if (transactions.length === 0) {
     return {
@@ -257,7 +310,7 @@ function queryCase(ledger, caseId) {
     summary: {
       transactionCount: transactions.length,
       lastUpdated: caseState.lastUpdated,
-      isClosed: !!caseState.assignmentInfo && caseState.custodyCheckpoints.length > 0,
+      isClosed: Boolean(caseState.receptionInfo),
     },
   };
 }
@@ -289,6 +342,164 @@ function getHealthSummary(ledger, orgName) {
   };
 }
 
+/**
+ * Tablero clínico: todos los donantes, la lista de espera, asignaciones
+ * (con score HLA derivado) y lecturas custody. Solo lectura del ledger.
+ */
+function buildOverview(ledger) {
+  const donorsById = new Map();
+  const patientsById = new Map();
+  const assignments = [];
+  const receptionsByOrgan = new Map();
+  const custodyByOrgan = new Map();
+  const txCounts = {};
+
+  for (const block of ledger) {
+    const { txType, payload = {}, timestamp, hash } = block;
+    txCounts[txType] = (txCounts[txType] || 0) + 1;
+
+    if (txType === "donor-registry" && payload.donorId) {
+      donorsById.set(payload.donorId, {
+        donorId: payload.donorId,
+        bloodType: payload.bloodType || null,
+        hlaProfile: payload.hlaProfile || null,
+        organType: payload.organType || null,
+        preservationMethod: payload.preservationMethod || null,
+        registeredAt: timestamp,
+      });
+    }
+
+    if (txType === "waiting-list" && payload.patientId) {
+      patientsById.set(payload.patientId, {
+        patientId: payload.patientId,
+        bloodType: payload.bloodType || null,
+        hlaProfile: payload.hlaProfile || null,
+        urgencyLevel: payload.urgencyLevel ?? null,
+        addedToWaitingListAt: timestamp,
+      });
+    }
+
+    if (txType === "assignment") {
+      assignments.push({
+        donorId: payload.donorId,
+        recipientId: payload.recipientId || payload.patientId,
+        organ: payload.organ || payload.organType || null,
+        assignedAt: timestamp,
+        compatibilityTimestamp: payload.compatibilityTimestamp || null,
+        hlaScore: payload.hlaScore,
+        hash,
+      });
+    }
+
+    if (txType === "reception") {
+      const organId = payload.donorId || payload.organId;
+      if (organId) {
+        receptionsByOrgan.set(organId, {
+          donorId: organId,
+          recipientId: payload.recipientId || payload.patientId || null,
+          hospital: payload.hospital || "hospital-receptor",
+          receivedAt: timestamp,
+        });
+      }
+    }
+
+    if (txType === "custody" && payload.organId) {
+      const prev = custodyByOrgan.get(payload.organId) || {
+        organId: payload.organId,
+        readings: 0,
+        alertCount: 0,
+      };
+      prev.readings += 1;
+      if (payload.fueraDeRango) prev.alertCount += 1;
+      prev.deviceId = payload.deviceId || prev.deviceId;
+      prev.lastTimestamp = timestamp;
+      prev.lastTempC = payload.temperaturaC ?? payload.value ?? prev.lastTempC;
+      prev.organo = payload.organo || prev.organo;
+      custodyByOrgan.set(payload.organId, prev);
+    }
+  }
+
+  const assignedPatientIds = new Set(assignments.map((a) => a.recipientId).filter(Boolean));
+  const assignedDonorIds = new Set(assignments.map((a) => a.donorId).filter(Boolean));
+  const receivedPatientIds = new Set(
+    [...receptionsByOrgan.values()].map((r) => r.recipientId).filter(Boolean)
+  );
+  const receivedDonorIds = new Set(receptionsByOrgan.keys());
+
+  const donors = [...donorsById.values()].map((d) => ({
+    ...d,
+    assigned: assignedDonorIds.has(d.donorId),
+    received: receivedDonorIds.has(d.donorId),
+  }));
+
+  const waitingList = [...patientsById.values()]
+    .map((p) => ({
+      ...p,
+      status: receivedPatientIds.has(p.patientId)
+        ? "recibido"
+        : assignedPatientIds.has(p.patientId)
+          ? "asignado"
+          : "en-espera",
+    }))
+    .sort((a, b) => (b.urgencyLevel || 0) - (a.urgencyLevel || 0));
+
+  const assignmentViews = assignments.map((a) => {
+    const donor = donorsById.get(a.donorId);
+    const patient = patientsById.get(a.recipientId);
+    const hlaScore =
+      typeof a.hlaScore === "number"
+        ? a.hlaScore
+        : donor && patient
+          ? calculateHLAScore(donor.hlaProfile, patient.hlaProfile)
+          : null;
+    const loci = ["A", "B", "DR"].map((locus) => {
+      const donorAllele = donor?.hlaProfile?.[locus] ?? null;
+      const recipientAllele = patient?.hlaProfile?.[locus] ?? null;
+      return {
+        locus,
+        donor: donorAllele,
+        recipient: recipientAllele,
+        match: Boolean(donorAllele && donorAllele === recipientAllele),
+      };
+    });
+    return {
+      ...a,
+      hlaScore,
+      organ: a.organ || donor?.organType || null,
+      donorBloodType: donor?.bloodType || null,
+      recipientBloodType: patient?.bloodType || null,
+      hlaLoci: loci,
+      hlaMatches: loci.filter((l) => l.match).length,
+      custody: custodyByOrgan.get(a.donorId) || null,
+      received: receivedDonorIds.has(a.donorId),
+      receivedAt: receptionsByOrgan.get(a.donorId)?.receivedAt || null,
+    };
+  });
+
+  const fromDemoScript = donorsById.has(DEMO_DONOR_ID) && patientsById.has(DEMO_PATIENT_ID);
+
+  return {
+    donors,
+    waitingList,
+    assignments: assignmentViews,
+    custody: [...custodyByOrgan.values()],
+    counts: {
+      donors: donors.length,
+      waiting: waitingList.length,
+      waitingUnassigned: waitingList.filter((p) => p.status === "en-espera").length,
+      assignments: assignmentViews.length,
+      custodyReadings: txCounts.custody || 0,
+      ledgerBlocks: ledger.length,
+    },
+    demoPitch: {
+      recognized: fromDemoScript,
+      donorId: DEMO_DONOR_ID,
+      patientId: DEMO_PATIENT_ID,
+      script: DEMO_SCRIPT,
+    },
+  };
+}
+
 module.exports = {
   extractCaseTransactions,
   buildCaseState,
@@ -296,4 +507,7 @@ module.exports = {
   extractTelemetrySeries,
   queryCase,
   getHealthSummary,
+  buildOverview,
+  DEMO_DONOR_ID,
+  DEMO_PATIENT_ID,
 };

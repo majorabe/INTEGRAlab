@@ -12,9 +12,9 @@ export function Field({
   const empty = value === undefined || value === null || value === ''
   return (
     <div className="min-w-0">
-      <dt className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</dt>
+      <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</dt>
       <dd
-        className={`mt-1 text-sm ${mono ? 'font-mono text-[13px] break-all' : 'font-medium'} ${empty ? 'text-muted-foreground' : 'text-foreground'}`}
+        className={`mt-1 text-base ${mono ? 'font-mono text-sm break-all' : 'font-medium'} ${empty ? 'text-muted-foreground' : 'text-foreground'}`}
       >
         {empty ? '—' : value}
       </dd>
@@ -36,8 +36,8 @@ export function SectionCard({
   return (
     <section className="rounded-lg border bg-card">
       <header className="border-b px-4 py-3">
-        <h2 className="text-sm font-semibold">{title}</h2>
-        {hint && <p className="text-xs text-muted-foreground mt-0.5">{hint}</p>}
+        <h2 className="text-base font-semibold">{title}</h2>
+        {hint && <p className="text-sm text-muted-foreground mt-0.5">{hint}</p>}
       </header>
       <div className="p-4">{empty ? <p className="text-sm text-muted-foreground">{empty}</p> : children}</div>
     </section>

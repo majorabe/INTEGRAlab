@@ -17,7 +17,7 @@ export const ROLE_CONFIGS: Record<RoleType, RoleConfig> = {
   'coordinador-nacional': {
     id: 'coordinador-nacional',
     name: 'Coordinador Nacional',
-    description: 'Réplica orderer (puerto 3001). Misma cadena que los pares.',
+    description: 'Vista nacional de donantes, lista y asignaciones',
     port: 3001,
     color: 'bg-teal-800',
     permissions: ['view-all-cases', 'view-timeline'],
@@ -25,7 +25,7 @@ export const ROLE_CONFIGS: Record<RoleType, RoleConfig> = {
   'coordinador-provincial': {
     id: 'coordinador-provincial',
     name: 'Coordinador Provincial',
-    description: 'Réplica en puerto 3002. Misma cadena que los pares.',
+    description: 'Vista jurisdiccional de la red de coordinación',
     port: 3002,
     color: 'bg-cyan-800',
     permissions: ['view-all-cases', 'view-timeline'],
@@ -33,7 +33,7 @@ export const ROLE_CONFIGS: Record<RoleType, RoleConfig> = {
   'hospital-donante': {
     id: 'hospital-donante',
     name: 'Hospital Donante',
-    description: 'Réplica en puerto 3003. Nodo que ingiere telemetría IoT.',
+    description: 'Origen del órgano y custodia del traslado',
     port: 3003,
     color: 'bg-emerald-800',
     permissions: ['view-donor', 'view-assignment'],
@@ -41,15 +41,15 @@ export const ROLE_CONFIGS: Record<RoleType, RoleConfig> = {
   'hospital-receptor': {
     id: 'hospital-receptor',
     name: 'Hospital Receptor',
-    description: 'Réplica en puerto 3004. Misma cadena que los pares.',
+    description: 'Centro de destino y recepción',
     port: 3004,
     color: 'bg-sky-800',
     permissions: ['view-assignment', 'view-telemetry'],
   },
   iot: {
     id: 'iot',
-    name: 'Vista IoT',
-    description: 'Lee telemetría desde el nodo de custodia (hospital-donante).',
+    name: 'Contenedor',
+    description: 'Seguimiento de temperatura durante el traslado',
     port: 3003,
     color: 'bg-amber-700',
     permissions: ['view-telemetry'],

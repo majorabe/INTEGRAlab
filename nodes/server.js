@@ -21,8 +21,9 @@ const { signPayload, verifySignature } = require("./lib/crypto-utils");
 const ledger = require("./lib/ledger");
 const { checkEndorsement } = require("./lib/endorsement");
 const { assertCustodyBusinessRules } = require("./lib/custody-rules");
+const { assertReceptionBusinessRules } = require("./lib/reception-rules");
 const { queryCompatible } = require("./lib/hla-matching");
-const { queryCase, getHealthSummary } = require("./lib/dashboard-projection");
+const { queryCase, getHealthSummary, buildOverview } = require("./lib/dashboard-projection");
 
 const ORG_NAME = process.env.ORG_NAME;
 const PORT = process.env.PORT || 3000;
@@ -218,6 +219,13 @@ app.post("/custody/ingest", async (req, res) => {
  * Esto previene fork de multi-origen: todas las transacciones pasan por
  * coordinador-nacional, que es la autoridad de ordenamiento (Fase 1).
  */
+function assertTxBusinessRules(txType, payload) {
+  const blocks = ledger.readLedger();
+  if (txType === "custody") return assertCustodyBusinessRules(payload, blocks);
+  if (txType === "reception") return assertReceptionBusinessRules(payload, blocks);
+  return { ok: true };
+}
+
 async function submitTransaction(txType, payload, signatures) {
   const validOrgs = [];
   const invalidReasons = [];
@@ -248,12 +256,9 @@ async function submitTransaction(txType, payload, signatures) {
     return { status: 403, body: { ok: false, reason: endorsement.reason } };
   }
 
-  // PASO COMÚN 2b: Custodia = trazabilidad de un órgano ya asignado
-  if (txType === "custody") {
-    const custodyRule = assertCustodyBusinessRules(payload, ledger.readLedger());
-    if (!custodyRule.ok) {
-      return { status: custodyRule.status, body: { ok: false, reason: custodyRule.reason } };
-    }
+  const business = assertTxBusinessRules(txType, payload);
+  if (!business.ok) {
+    return { status: business.status, body: { ok: false, reason: business.reason } };
   }
 
   // BIFURCACIÓN: IS_ORDERER
@@ -459,10 +464,10 @@ app.post("/internal/order-and-replicate", async (req, res) => {
     });
   }
 
-  if (block.txType === "custody") {
-    const custodyRule = assertCustodyBusinessRules(block.payload, ledger.readLedger());
-    if (!custodyRule.ok) {
-      return res.status(custodyRule.status).json({ ok: false, reason: custodyRule.reason });
+  if (block.txType === "custody" || block.txType === "reception") {
+    const business = assertTxBusinessRules(block.txType, block.payload);
+    if (!business.ok) {
+      return res.status(business.status).json({ ok: false, reason: business.reason });
     }
   }
 
@@ -707,6 +712,31 @@ app.get("/dashboard/health", (req, res) => {
   const ledgerData = ledger.readLedger();
   const health = getHealthSummary(ledgerData, ORG_NAME);
   res.json(health);
+});
+
+function isDashboardReader(actor) {
+  return (
+    actor === ORG_NAME ||
+    actor === "auditor" ||
+    actor === "coordinador-nacional" ||
+    actor === "coordinador-provincial"
+  );
+}
+
+/**
+ * Tablero clínico: donantes, lista de espera, asignaciones y custody.
+ * GET /dashboard/overview
+ */
+app.get("/dashboard/overview", (req, res) => {
+  const actor = req.header("x-actor");
+  if (!isDashboardReader(actor)) {
+    return res.status(403).json({
+      ok: false,
+      reason: `Actor "${actor || "(sin identificar)"}" no autorizado a consultar dashboard`,
+    });
+  }
+  const overview = buildOverview(ledger.readLedger());
+  res.json({ ok: true, ...overview });
 });
 
 async function replicateToPeers(block) {

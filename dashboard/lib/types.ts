@@ -46,6 +46,12 @@ export interface CaseState {
     unit: string
     deviceId: string
   }>
+  receptionInfo: {
+    donorId: string
+    recipientId: string | null
+    hospital: string
+    receivedAt: string
+  } | null
   transactionCount: number
   lastUpdated: string
 }
@@ -67,7 +73,7 @@ export interface CaseResponse {
 // Respuesta de Fase 1: GET /dashboard/casos/:id/timeline
 export interface TimelineEvent {
   timestamp: string
-  type: 'donor-registry' | 'waiting-list' | 'assignment' | 'custody'
+  type: 'donor-registry' | 'waiting-list' | 'assignment' | 'custody' | 'reception'
   action: string
   actors: string[]
   actorCount: number
@@ -188,7 +194,94 @@ export interface AssignmentForm {
   hlaScore?: number
 }
 
-// Estado de la aplicación
+export interface HlaLocusMatch {
+  locus: 'A' | 'B' | 'DR' | string
+  donor: string | null
+  recipient: string | null
+  match: boolean
+}
+
+export interface OverviewDonor {
+  donorId: string
+  bloodType: string | null
+  hlaProfile: { A: string; B: string; DR: string } | null
+  organType: string | null
+  preservationMethod: string | null
+  registeredAt: string
+  assigned: boolean
+  received?: boolean
+}
+
+export interface OverviewPatient {
+  patientId: string
+  bloodType: string | null
+  hlaProfile: { A: string; B: string; DR: string } | null
+  urgencyLevel: number | null
+  addedToWaitingListAt: string
+  status: 'en-espera' | 'asignado' | string
+}
+
+export interface OverviewCustody {
+  organId: string
+  readings: number
+  alertCount?: number
+  deviceId?: string
+  lastTimestamp?: string
+  lastTempC?: number
+  organo?: string
+}
+
+export interface OverviewAssignment {
+  donorId: string
+  recipientId: string
+  organ: string | null
+  assignedAt: string
+  compatibilityTimestamp: string | null
+  hlaScore: number | null
+  hash?: string
+  donorBloodType: string | null
+  recipientBloodType: string | null
+  hlaLoci: HlaLocusMatch[]
+  hlaMatches: number
+  custody: OverviewCustody | null
+  received?: boolean
+  receivedAt?: string | null
+}
+
+export interface LedgerOverview {
+  ok: boolean
+  donors: OverviewDonor[]
+  waitingList: OverviewPatient[]
+  assignments: OverviewAssignment[]
+  custody: OverviewCustody[]
+  counts: {
+    donors: number
+    waiting: number
+    waitingUnassigned: number
+    assignments: number
+    custodyReadings: number
+    ledgerBlocks: number
+  }
+  demoPitch: {
+    recognized: boolean
+    donorId: string
+    patientId: string
+    script: string
+  }
+}
+
+export interface IotHealth {
+  ok: boolean
+  service: string
+  container: string
+  deviceId: string
+  organId: string
+  phase: 'esperando-assignment' | 'escribiendo' | string
+  lastSequence: number
+  lastTempC: number | null
+  lastError: string | null
+  startedAt: string
+}
 export interface AppState {
   currentRole: RoleType
   nodeUrl: string

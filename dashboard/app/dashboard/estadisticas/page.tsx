@@ -72,7 +72,7 @@ export default function EstadisticasPage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Estadísticas del ledger</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">Estadísticas</h1>
         <p className="text-sm text-muted-foreground">Cargando...</p>
       </div>
     )
@@ -82,7 +82,7 @@ export default function EstadisticasPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold tracking-tight">Estadísticas del ledger</h1>
+          <h1 className="text-3xl font-semibold tracking-tight">Estadísticas</h1>
           <Link
             href="/dashboard"
             className="text-xs px-3 py-1 rounded-md border border-input hover:bg-accent"
@@ -111,14 +111,13 @@ export default function EstadisticasPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight">Estadísticas del ledger</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">Estadísticas</h1>
         <div className="text-xs text-muted-foreground">
           Actualizado {stats.lastUpdate}
         </div>
       </div>
-      <p className="text-sm text-muted-foreground max-w-2xl">
-        Conteo de bloques de este nodo (todas las tx). No es una lista de pacientes. Con IoT apagado
-        y sin script, todo en 0. En tránsito, custody sube cada ~5 s.
+      <p className="text-base text-muted-foreground max-w-2xl">
+        Volumen de hechos registrados por esta organización.
       </p>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

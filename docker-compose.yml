@@ -97,7 +97,11 @@ services:
       - INTERVALO_MS=5000
       - ORGANO=rinon
       - SIMULAR_FALLA_TEMP=true
+      - LECTURAS_MAX=8
       - ORGAN_ID=${ORGAN_ID:-demo-pitch-donor-001}
+      - HEALTH_PORT=3010
+    ports:
+      - "3010:3010"
     volumes:
       - ./certs:/certs:ro
     depends_on:
@@ -109,6 +113,12 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=production
+      - INTEGRA_REPO_ROOT=/integralab
+      - INTEGRA_NODES_HOST_MODE=compose
+      - CERTS_DIR=/certs
+    volumes:
+      - .:/integralab:ro
+      - ./certs:/certs:ro
     depends_on:
       - coordinador-nacional
       - coordinador-provincial

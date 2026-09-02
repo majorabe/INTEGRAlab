@@ -9,7 +9,7 @@
  */
 
 const axios = require('axios');
-const { createAuthenticatedClient } = require('../helpers/http');
+const { createAuthenticatedClient, NODES } = require('../helpers/http');
 const { waitingListEntry } = require('../helpers/fixtures');
 const crypto = require('crypto');
 const fs = require('fs');
@@ -39,7 +39,7 @@ async function run() {
     const coordClient = createAuthenticatedClient('coordinador-nacional');
 
     // Obtener estado inicial (usar axios directo con x-actor header)
-    const initialLedgerResp = await axios.get('http://localhost:3001/ledger', {
+    const initialLedgerResp = await axios.get(`${NODES['coordinador-nacional']}/ledger`, {
       headers: { 'x-actor': 'coordinador-nacional' },
       validateStatus: () => true,
     });
@@ -170,7 +170,7 @@ async function run() {
 
     // PASO 6: Verificar que ledger NO creció (bloque no se persistió localmente)
     // Verificar vía endpoint /ledger
-    const ledgerAfterResp = await axios.get('http://localhost:3001/ledger', {
+    const ledgerAfterResp = await axios.get(`${NODES['coordinador-nacional']}/ledger`, {
       headers: { 'x-actor': 'coordinador-nacional' },
       validateStatus: () => true,
     });

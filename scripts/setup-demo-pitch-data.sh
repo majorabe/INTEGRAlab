@@ -5,8 +5,9 @@
 #   1. donor-registry      → donante demo-pitch-donor-001
 #   2. waiting-list        → paciente demo-pitch-patient-001
 #   3. assignment          → vínculo donante↔paciente (inicio de trazabilidad)
-# Después arranca el IoT (profile compose `iot`). El simulador espera el
-# assignment y recién ahí graba bloques custody con organId = donorId.
+#   4. custody             → lecturas IoT del traslado (tope corto)
+#   5. reception           → hospital receptor cierra el circuito
+# Después detiene el IoT: el órgano ya llegó.
 #
 # Uso (raíz del repo, nodos ya arriba, IoT NO tiene que estar corriendo):
 #   bash scripts/setup-demo-pitch-data.sh
@@ -24,6 +25,7 @@ REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 
 COORD_URL="http://localhost:3001"
 DONANTE_URL="http://localhost:3003"
+RECEPTOR_URL="http://localhost:3004"
 
 DONOR_ID="demo-pitch-donor-001"
 PATIENT_ID="demo-pitch-patient-001"
@@ -171,38 +173,95 @@ require_ok "assignment" "$ASSIGN_TX"
 echo -e "${GREEN}✓ Asignación creada (órgano en condiciones de transitar)${NC}"
 sleep 2
 
-# --- 4. Arrancar IoT: a partir de acá, 1 bloque custody cada 5s ---
+# --- 4. Traslado IoT (lecturas acotadas) y recepción ---
 echo ""
 echo -e "${YELLOW}[6] Arrancando iot-simulator (profile iot, organId=$DONOR_ID)...${NC}"
 cd "$REPO_ROOT"
+docker compose --profile iot stop iot-simulator >/dev/null 2>&1 || true
 if ORGAN_ID="$DONOR_ID" docker compose --profile iot up -d iot-simulator; then
-  echo -e "${GREEN}✓ IoT arriba. Espera el assignment y luego escribe custody cada 5s.${NC}"
+  echo -e "${GREEN}✓ IoT arriba. Escribe custody hasta la recepción.${NC}"
 else
   echo -e "${RED}✗ No se pudo levantar iot-simulator${NC}"
   echo "Manual: ORGAN_ID=$DONOR_ID docker compose --profile iot up -d iot-simulator"
   exit 1
 fi
 
+MIN_CUSTODY=5
+echo -e "${YELLOW}[7] Esperando $MIN_CUSTODY lecturas de custodia (traslado en curso)...${NC}"
+READINGS=0
+for _ in $(seq 1 30); do
+  READINGS="$(curl -s -H "x-actor: coordinador-nacional" "$COORD_URL/dashboard/overview" | jq -r '.counts.custodyReadings // 0')"
+  echo "    lecturas en ledger: $READINGS"
+  if [[ "$READINGS" =~ ^[0-9]+$ ]] && [[ "$READINGS" -ge "$MIN_CUSTODY" ]]; then
+    break
+  fi
+  sleep 3
+done
+if ! [[ "$READINGS" =~ ^[0-9]+$ ]] || [[ "$READINGS" -lt "$MIN_CUSTODY" ]]; then
+  echo -e "${RED}✗ El IoT no escribió $MIN_CUSTODY lecturas a tiempo (hay $READINGS)${NC}"
+  echo "Revisá: docker compose logs iot-simulator"
+  exit 1
+fi
+echo -e "${GREEN}✓ Traslado registrado ($READINGS lecturas)${NC}"
+
+echo ""
+echo -e "${YELLOW}[8] reception → 1 bloque (hospital-receptor + coordinador-nacional)${NC}"
+RECEPTION_PAYLOAD='{
+  "donorId":"'"$DONOR_ID"'",
+  "organId":"'"$DONOR_ID"'",
+  "recipientId":"'"$PATIENT_ID"'",
+  "hospital":"hospital-receptor"
+}'
+
+COORD_RX_SIG=$(curl -s -X POST "$COORD_URL/sign" \
+  -H "Content-Type: application/json" \
+  -d "{\"payload\":$RECEPTION_PAYLOAD}" | jq -r '.signature // empty')
+
+RECEPTOR_RX_SIG=$(curl -s -X POST "$RECEPTOR_URL/sign" \
+  -H "Content-Type: application/json" \
+  -d "{\"payload\":$RECEPTION_PAYLOAD}" | jq -r '.signature // empty')
+
+if [[ -z "$COORD_RX_SIG" || -z "$RECEPTOR_RX_SIG" ]]; then
+  echo -e "${RED}✗ Fallo al firmar recepción${NC}"
+  exit 1
+fi
+
+RX_TX=$(curl -s -X POST "$RECEPTOR_URL/tx/reception" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"payload\":$RECEPTION_PAYLOAD,
+    \"signatures\":[
+      {\"actor\":\"hospital-receptor\",\"signature\":\"$RECEPTOR_RX_SIG\"},
+      {\"actor\":\"coordinador-nacional\",\"signature\":\"$COORD_RX_SIG\"}
+    ]
+  }")
+require_ok "reception" "$RX_TX"
+echo -e "${GREEN}✓ Órgano recibido en hospital receptor. Circuito cerrado.${NC}"
+
+echo -e "${YELLOW}[9] Deteniendo iot-simulator (el traslado terminó)...${NC}"
+docker compose --profile iot stop iot-simulator >/dev/null 2>&1 || true
+echo -e "${GREEN}✓ IoT detenido. No se escriben más bloques de custodia.${NC}"
+
 HEIGHT=$(curl -s "$COORD_URL/health" | jq -r '.ledgerHeight // .ledgerBlocks // 0')
 
 echo ""
 echo -e "${BLUE}========================================${NC}"
-echo -e "${GREEN}✓ CASO CLÍNICO LISTO${NC}"
+echo -e "${GREEN}✓ CASO CLÍNICO CERRADO${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 echo "Hechos en el ledger (replicados en los 4 nodos):"
 echo "  1. donor-registry   $DONOR_ID"
 echo "  2. waiting-list     $PATIENT_ID"
 echo "  3. assignment       $DONOR_ID → $PATIENT_ID"
-echo "  4. custody          en curso (IoT, organId=$DONOR_ID)"
+echo "  4. custody          $READINGS lecturas (organId=$DONOR_ID)"
+echo "  5. reception        hospital-receptor (cierre de trazabilidad)"
 echo ""
-echo "Altura actual (orderer): $HEIGHT  — va a subir cada ~5s mientras el IoT corra."
+echo "Altura actual (orderer): $HEIGHT  — estable: el IoT ya no escribe."
 echo ""
 echo "Dashboard clínico: http://localhost:3000/dashboard"
 echo "Consultar:         $DONOR_ID"
 echo ""
-echo "Infra (misma cadena, sin proyección clínica): http://localhost:3000/infra"
+echo "Infra:             http://localhost:3000/infra"
 echo ""
-echo "Para cortar telemetría:  docker compose stop iot-simulator"
 echo "Para empezar de cero:    ./scripts/reset.sh --force && docker compose up --build -d"
 echo ""

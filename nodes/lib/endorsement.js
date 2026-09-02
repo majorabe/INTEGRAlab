@@ -91,6 +91,18 @@ const POLICIES = {
       reason: ok ? null : "CustodyChain requiere firma de un dispositivo IoT + endorsement de un hospital",
     };
   },
+
+  // Reception: el hospital de destino confirma la llegada y el coordinador
+  // nacional endosa el cierre del circuito de trazabilidad.
+  reception: (validOrgs) => {
+    const ok = validOrgs.includes("hospital-receptor") && validOrgs.includes("coordinador-nacional");
+    return {
+      ok,
+      reason: ok
+        ? null
+        : "Recepción requiere firma de hospital-receptor + coordinador-nacional",
+    };
+  },
 };
 
 /**

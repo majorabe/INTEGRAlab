@@ -15,12 +15,25 @@ if (!CERTS_DIR) {
   CERTS_DIR = fs.existsSync(localCerts) ? localCerts : '/certs';
 }
 
-const NODES = {
-  'coordinador-nacional': 'http://localhost:3001',
-  'coordinador-provincial': 'http://localhost:3002',
-  'hospital-donante': 'http://localhost:3003',
-  'hospital-receptor': 'http://localhost:3004',
-};
+function buildNodeUrls() {
+  if (process.env.INTEGRA_NODES_HOST_MODE === 'compose') {
+    return {
+      'coordinador-nacional': 'http://coordinador-nacional:3000',
+      'coordinador-provincial': 'http://coordinador-provincial:3000',
+      'hospital-donante': 'http://hospital-donante:3000',
+      'hospital-receptor': 'http://hospital-receptor:3000',
+    }
+  }
+  const host = process.env.INTEGRA_NODES_HOST || 'localhost'
+  return {
+    'coordinador-nacional': `http://${host}:3001`,
+    'coordinador-provincial': `http://${host}:3002`,
+    'hospital-donante': `http://${host}:3003`,
+    'hospital-receptor': `http://${host}:3004`,
+  }
+}
+
+const NODES = buildNodeUrls()
 
 /**
  * Crea un cliente axios configurado para un nodo específico

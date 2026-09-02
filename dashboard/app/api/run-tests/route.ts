@@ -12,6 +12,11 @@ import path from 'path'
 import { rejectUnlessLocalhost } from '../_lib/localhost'
 
 function findRepoRoot(): string | null {
+  const fromEnv = process.env.INTEGRA_REPO_ROOT
+  if (fromEnv) {
+    const suite = path.join(fromEnv, 'tests', 'run-tests.js')
+    if (fs.existsSync(suite)) return fromEnv
+  }
   const guesses = [path.resolve(process.cwd(), '..'), path.resolve(process.cwd())]
   for (const root of guesses) {
     const suite = path.join(root, 'tests', 'run-tests.js')
@@ -31,7 +36,7 @@ function unavailableBody() {
     total: 0,
     exitCode: null,
     error:
-      'La suite no está en la imagen del dashboard. Un ledger vacío no impide los tests: ellos escriben sus propias txs (y algunos bajan nodos). En el host, desde la raíz del repo: npm run test:seguridad',
+      'No se encontró tests/run-tests.js. Si el dashboard corre en Docker, reconstruí: docker compose up --build -d dashboard. En el host: npm run test:seguridad',
     command: 'npm run test:seguridad',
     stdout: '',
     stderr: '',

@@ -1,6 +1,6 @@
 /**
  * Test Runner para INTEGRA Security Test Suite
- * Ejecuta 19 tests organizados en 8 bloques (A-H)
+ * Ejecuta 20 tests organizados en 8 bloques (A-H)
  * Bloques A-G: Paso 1-2 (Criptografía, Endorsement, IoT, RBAC, Resiliencia, Auditoría)
  * Bloque H: Fase 3-4 (Quorum de Replicación)
  */
@@ -61,6 +61,7 @@ const TEST_BLOCKS = [
     name: 'Block G: Trazabilidad y Auditoría',
     tests: [
       'trazabilidad/test18-auditoriaFirmasE2E.js',
+      'trazabilidad/test20-receptionCierraCircuito.js',
     ],
   },
   {

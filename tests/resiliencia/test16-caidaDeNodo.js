@@ -7,6 +7,7 @@
 const { createAuthenticatedClient } = require('../helpers/http');
 const { spawn } = require('child_process');
 const { donorPayload } = require('../helpers/fixtures');
+const { skipIfNoDocker } = require('../helpers/docker-detect');
 const crypto = require('crypto');
 
 /**
@@ -47,6 +48,10 @@ function runDockerCommand(args) {
 
 async function run() {
   const name = 'test16_caidaDeNodo';
+
+  // Skip if Docker no está disponible (ej. corriendo dentro del dashboard en Docker)
+  const skipResult = skipIfNoDocker(name);
+  if (skipResult) return skipResult;
 
   try {
     const client = createAuthenticatedClient('hospital-donante');

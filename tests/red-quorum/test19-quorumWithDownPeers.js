@@ -11,6 +11,7 @@
 const axios = require('axios');
 const { createAuthenticatedClient, NODES } = require('../helpers/http');
 const { waitingListEntry } = require('../helpers/fixtures');
+const { skipIfNoDocker } = require('../helpers/docker-detect');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
@@ -32,6 +33,11 @@ async function sleep(ms) {
 
 async function run() {
   const name = 'test19_quorumWithDownPeers';
+
+  // Skip if Docker no está disponible (ej. corriendo dentro del dashboard en Docker)
+  const skipResult = skipIfNoDocker(name);
+  if (skipResult) return skipResult;
+
   let nodosDetenidos = false;
 
   try {

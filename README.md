@@ -7,6 +7,18 @@ Prototipo: ledger hash-encadenado + PKI X.509 + telemetría IoT + compatibilidad
 
 **Video:** [demostración](https://video-wciso-integra.vercel.app/)
 **Presentación:** [presentación](https://comforting-cranachan-f05a65.netlify.app/)
+
+
+## Equipo
+
+| Nombre | País | Perfil | Contacto |
+|--------|------|--------|----------|
+| **María José Rabellino** | Argentina | Ingeniera en Sistemas · Máster en Ingeniería Blockchain | [majorabellino@gmail.com](mailto:majorabellino@gmail.com) |
+| **Silvia Hernández Márquez** | México | Ingeniera en Software y Redes | [silvia03hm@gmail.com](mailto:silvia03hm@gmail.com) |
+| **Angely Samira Segovia Chávez** | Ecuador | Estudiante avanzada de Ingeniería en Software | [angesegoviachavez@gmail.com](mailto:angesegoviachavez@gmail.com) |
+
+
+
 ---
 
 ## Quick start

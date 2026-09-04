@@ -6,7 +6,7 @@ Prototipo: ledger hash-encadenado + PKI X.509 + telemetría IoT + compatibilidad
 **4 nodos, 20 tests de seguridad, dashboard de consulta clínica y de infraestructura.**
 
 **Video:** [demostración](https://video-wciso-integra.vercel.app/)
-
+**Presentación:** [presentación](https://comforting-cranachan-f05a65.netlify.app/)
 ---
 
 ## Quick start

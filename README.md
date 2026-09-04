@@ -5,7 +5,7 @@ Infraestructura de Trazabilidad e Identidad para la Gestión de Recursos de Asig
 Prototipo: ledger hash-encadenado + PKI X.509 + telemetría IoT + compatibilidad HLA.
 **4 nodos, 20 tests de seguridad, dashboard de consulta clínica y de infraestructura.**
 
-## ❤️ [Mira nuestro video](https://video-wciso-integra.vercel.app/)
+### ❤️ [Mira nuestro video](https://video-wciso-integra.vercel.app/)
 
 ### 🔗 [Mira nuestra presentación](https://comforting-cranachan-f05a65.netlify.app/)
 

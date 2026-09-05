@@ -1,0 +1,12 @@
+{
+  "name": "integra-ca-generator",
+  "version": "1.0.0",
+  "description": "Generador de jerarquia de Autoridades Certificantes (CA) para INTEGRA",
+  "main": "generate-ca-hierarchy.js",
+  "scripts": {
+    "generate": "node generate-ca-hierarchy.js"
+  },
+  "dependencies": {
+    "node-forge": "^1.3.1"
+  }
+}

@@ -1,0 +1,44 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Tema claro clínico. Los tokens de :root estaban invertidos (muted-foreground
+   casi blanco sobre fondo blanco). No reutilizar la paleta de /infra. */
+:root {
+  --background: 210 20% 98%;
+  --foreground: 222 47% 11%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+  --muted: 210 16% 95%;
+  --muted-foreground: 215 16% 28%;
+  --accent: 173 30% 94%;
+  --accent-foreground: 175 55% 18%;
+  --destructive: 0 72% 46%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 214 25% 88%;
+  --input: 214 25% 88%;
+  --primary: 175 55% 22%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 210 16% 93%;
+  --secondary-foreground: 222 47% 11%;
+  --ring: 175 55% 22%;
+  --radius: 0.5rem;
+}
+
+* {
+  @apply border-border;
+}
+
+html {
+  font-size: 17px;
+}
+
+body {
+  @apply bg-background text-foreground antialiased;
+}
+
+.font-tabular {
+  font-variant-numeric: tabular-nums;
+}

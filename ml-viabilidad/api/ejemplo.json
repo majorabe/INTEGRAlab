@@ -1,0 +1,22 @@
+{
+  "caso_id": "TRASLADO-DEMO-001",
+  "organo": "kidney",
+  "extraido_en": "2026-08-25T09:00:00Z",
+  "lecturas": [
+    {"timestamp": "2026-08-25T10:00:00Z", "temperaturaC": 4.0, "humedadPct": 85.0},
+    {"timestamp": "2026-08-25T10:05:00Z", "temperaturaC": 8.0, "humedadPct": 84.7},
+    {"timestamp": "2026-08-25T10:10:00Z", "temperaturaC": 13.0, "humedadPct": 84.4},
+    {"timestamp": "2026-08-25T10:15:00Z", "temperaturaC": 18.0, "humedadPct": 84.1},
+    {"timestamp": "2026-08-25T10:20:00Z", "temperaturaC": 21.0, "humedadPct": 83.8},
+    {"timestamp": "2026-08-25T10:25:00Z", "temperaturaC": 22.0, "humedadPct": 83.5}
+  ],
+  "destino_original": {
+    "nombre": "Hospital General - Xalapa",
+    "distancia_km": 301.7,
+    "velocidad_estimada_kmh": 65
+  },
+  "destinos_alternativos": [
+    {"nombre": "Hospital Regional - Cordoba", "distancia_km": 40, "velocidad_estimada_kmh": 55},
+    {"nombre": "Hospital de Especialidades - Veracruz", "distancia_km": 150, "velocidad_estimada_kmh": 70}
+  ]
+}
